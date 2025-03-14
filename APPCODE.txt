@@ -1,0 +1,201 @@
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+
+const products = [
+  { "id": 1, "name": "साबण (हल्दी चंदन )", "sp": 42, "pv": 20 },
+  { "id": 2, "name": "जास्मिन साबण", "sp": 28, "pv": 14 },
+  { "id": 3, "name": "सेनसेशन साबण", "sp": 38, "pv": 23 },
+  { "id": 4, "name": "पावडर", "sp": 60, "pv": 36 },
+  { "id": 5, "name": "बॉडी वाश", "sp": 110, "pv": 66 },
+  { "id": 6, "name": "बॉडीलोशन", "sp": 98, "pv": 59 },
+  { "id": 7, "name": "फूट क्रीम", "sp": 70, "pv": 42 },
+  { "id": 8, "name": "सॉफलीन", "sp": 36, "pv": 22 },
+  { "id": 9, "name": "पेन बाम", "sp": 32, "pv": 19 },
+  { "id": 10, "name": "पेन गो", "sp": 65, "pv": 39 },
+  { "id": 11, "name": "हंड वाश", "sp": 95, "pv": 57 },
+  { "id": 12, "name": "हायड्रेशेन कोरफड", "sp": 75, "pv": 45 },
+  { "id": 13, "name": "फ्रेश अंड शाईन", "sp": 63, "pv": 37 },
+  { "id": 14, "name": "फेस वाश", "sp": 65, "pv": 39 },
+  { "id": 15, "name": "सरसो हेअर ओईल", "sp": 75, "pv": 45 },
+  { "id": 16, "name": "हर्बल हेअर ओईल", "sp": 68, "pv": 41 },
+  { "id": 17, "name": "थंडाथंडा हेअर ओईल", "sp": 88, "pv": 53 },
+  { "id": 18, "name": "कोकोनट ओईल", "sp": 124, "pv": 74 },
+  { "id": 19, "name": "रिवीटो शाम्पू", "sp": 98, "pv": 59 },
+  { "id": 20, "name": "अंटी हेअर फाल शाम्पू २०० ML", "sp": 95, "pv": 57 },
+  { "id": 21, "name": "हर्बल हेअर शाम्पू", "sp": 64, "pv": 38 },
+  { "id": 22, "name": "लाल टूथ पेस्ट", "sp": 52, "pv": 31 },
+  { "id": 23, "name": "रेगुलेर पेस्ट", "sp": 42, "pv": 25 },
+  { "id": 24, "name": "टूथ ब्रश", "sp": 26, "pv": 15 },
+  { "id": 25, "name": "टूथ ब्रश सोफ्ट", "sp": 40, "pv": 24 },
+  { "id": 26, "name": "दंत मंजन", "sp": 45, "pv": 27 },
+  { "id": 27, "name": "शेविंग क्रीम", "sp": 45, "pv": 27 },
+  { "id": 28, "name": "व्योमिनी फेसिअल कीट", "sp": 149, "pv": 89 },
+  { "id": 29, "name": "व्योमिनी फेस स्क्रब", "sp": 100, "pv": 60 },
+  { "id": 30, "name": "व्योमिनी क्रीम", "sp": 125, "pv": 75 },
+  { "id": 31, "name": "व्योमिनी साबण", "sp": 52, "pv": 31 },
+  { "id": 32, "name": "व्योमिनी लोशन", "sp": 160, "pv": 96 },
+  { "id": 33, "name": "व्योमिनी शाम्पू", "sp": 249, "pv": 149 },
+  { "id": 34, "name": "व्योमिनी हेअर ओईल", "sp": 150, "pv": 90 },
+  { "id": 35, "name": "व्योमिनी हेअर कंडीशनर", "sp": 100, "pv": 60 },
+  { "id": 36, "name": "कपडा साबण", "sp": 9, "pv": 3 },
+  { "id": 37, "name": "प्राईम कपडा साबण", "sp": 32, "pv": 19 },
+  { "id": 38, "name": "वाशिंग पावडर २ KG", "sp": 142, "pv": 71 },
+  { "id": 39, "name": "वाशिंग पावडर १३० GM", "sp": 9, "pv": 3 },
+  { "id": 40, "name": "नीळ १०० ML", "sp": 24, "pv": 14 },
+  { "id": 41, "name": "लिक्विड वाशिंग", "sp": 115, "pv": 69 },
+  { "id": 42, "name": "रिवीटो वाशिंग पावडर ५०० ग्राम", "sp": 64, "pv": 38 },
+  { "id": 43, "name": "प्राईम वाशिंग पावडर ५०० GM", "sp": 110, "pv": 66 },
+  { "id": 44, "name": "फिनैल 1 लिटर", "sp": 60, "pv": 30 },
+  { "id": 45, "name": "फ्लोर क्लीनर ५०० ML", "sp": 90, "pv": 54 },
+  { "id": 46, "name": "ग्लास क्लीनर ५०० ML", "sp": 80, "pv": 48 },
+  { "id": 47, "name": "टोईलेट क्लीनर", "sp": 85, "pv": 51 },
+  { "id": 48, "name": "भांडे साबण १२० GM", "sp": 9, "pv": 4 },
+  { "id": 49, "name": "डिशवाश लिक्विड ५०० ML", "sp": 100, "pv": 60 },
+  { "id": 50, "name": "निम अगरबत्ती", "sp": 25, "pv": 15 },
+  { "id": 51, "name": "३ इन 1 अगरबत्ती", "sp": 50, "pv": 30 },
+  { "id": 52, "name": "कापूर अगरबत्ती", "sp": 25, "pv": 15 },
+  { "id": 53, "name": "धूप चंदन", "sp": 12, "pv": 7 },
+  { "id": 54, "name": "मल्टीग्रेन पीठ २ KG", "sp": 154, "pv": 46 },
+  { "id": 55, "name": "गहू पीठ ५ KG", "sp": 250, "pv": 50 },
+  { "id": 56, "name": "चोको लिक २५० GM", "sp": 112, "pv": 67 },
+  { "id": 57, "name": "हेल्थ गार्ड तेल", "sp": 192, "pv": 71 },
+  { "id": 58, "name": "जीरा १०० GM", "sp": 77, "pv": 29 },
+  { "id": 59, "name": "हिंग २५ GM", "sp": 45, "pv": 27 },
+  { "id": 60, "name": "मिरची पावडर २०० GM", "sp": 88, "pv": 53 },
+  { "id": 61, "name": "सब्जी मसाला १०० GM", "sp": 48, "pv": 29 },
+  { "id": 62, "name": "चहा मसाला ५० GM", "sp": 50, "pv": 30 },
+  { "id": 63, "name": "रसोई तडका १०० GM", "sp": 63, "pv": 37 },
+  { "id": 64, "name": "धने पावडर २०० GM", "sp": 58, "pv": 35 },
+  { "id": 65, "name": "गरम मसाला ५० GM", "sp": 55, "pv": 33 },
+  { "id": 66, "name": "हळद पावडर २०० GM", "sp": 70, "pv": 42 },
+  { "id": 67, "name": "मीठ 1 KG", "sp": 18, "pv": 6 },
+  { "id": 68, "name": "मिरची लोणचे २०० GM", "sp": 45, "pv": 27 },
+  { "id": 69, "name": "खट्टा मीठा लिंबू लोणचे २०० GM", "sp": 46, "pv": 28 },
+  { "id": 70, "name": "आंबा लोणचे २५० GM", "sp": 54, "pv": 32 },
+  { "id": 71, "name": "मिक्स लोणचे २५० GM", "sp": 54, "pv": 32 },
+  { "id": 72, "name": "अठाणा मिरची लोणचे २०० GM", "sp": 40, "pv": 24 },
+  { "id": 73, "name": "गार्लिक चना पापड", "sp": 76, "pv": 38 },
+  { "id": 74, "name": "चना पापड २५० GM", "sp": 74, "pv": 37 },
+  { "id": 75, "name": "मुग पापड ४०० GM", "sp": 152, "pv": 76 },
+  { "id": 76, "name": "जम २०० GM", "sp": 62, "pv": 37 },
+  { "id": 77, "name": "कोर्न फ्लेक्स", "sp": 86, "pv": 51 },
+  { "id": 78, "name": "स्क्रचं मन्गो / ऑरेंज २५० GM", "sp": 68, "pv": 41 },
+  { "id": 79, "name": "जलजीरा १०० GM", "sp": 42, "pv": 25 },
+  { "id": 80, "name": "मधु संयम रस", "sp": 425, "pv": 255 },
+  { "id": 81, "name": "गुळवेल तुळस रस 1 लिटर", "sp": 249, "pv": 124 },
+  { "id": 82, "name": "कोरफड आवळा रस 1 लिटर", "sp": 249, "pv": 124 },
+  { "id": 83, "name": "सूप ५० GM", "sp": 45, "pv": 27 },
+  { "id": 84, "name": "गुड सिप २७ GM", "sp": 20, "pv": 15 },
+  { "id": 85, "name": "बासमती तांदूळ 1 KG", "sp": 130, "pv": 38 },
+  { "id": 86, "name": "शेजवान चटणी ९० GM", "sp": 35, "pv": 21 },
+  { "id": 87, "name": "खजूर चिंच चटणी ९० GM", "sp": 35, "pv": 21 },
+  { "id": 88, "name": "लसून मिरची १५ GM", "sp": 9, "pv": 4 },
+  { "id": 89, "name": "किनिवा ५०० GM", "sp": 180, "pv": 108 },
+  { "id": 90, "name": "टोमटो केच उप ४०० GM", "sp": 58, "pv": 29 },
+  { "id": 91, "name": "टोमटो केच उप 1 KG", "sp": 128, "pv": 64 },
+  { "id": 92, "name": "मध २५० GM", "sp": 136, "pv": 80 },
+  { "id": 93, "name": "रस गुल्ला 1 KG", "sp": 168, "pv": 84 },
+  { "id": 94, "name": "सोन पापडी २५० GM", "sp": 95, "pv": 57 },
+  { "id": 95, "name": "सोन पापडी १७० GM", "sp": 50, "pv": 25 },
+  { "id": 96, "name": "मुग डाळ ८० GM", "sp": 28, "pv": 14 },
+  { "id": 97, "name": "कोकोनट बिस्कीट ९० GM", "sp": 26, "pv": 13 },
+  { "id": 98, "name": "फायबर बिस्कीट १०० GM", "sp": 26, "pv": 13 },
+  { "id": 99, "name": "क्रीम बिस्कीट १०० GM", "sp": 29, "pv": 14 },
+  { "id": 100, "name": "जीरा बिस्कीट ५० GM", "sp": 13, "pv": 6 },
+  { "id": 101, "name": "इडली मिक्स ३०० GM", "sp": 82, "pv": 49 },
+  { "id": 102, "name": "गुलाब जामुन १०० GM", "sp": 82, "pv": 49 },
+  { "id": 103, "name": "वेज बाईट", "sp": 148, "pv": 89 },
+  { "id": 104, "name": "प्रोटीज", "sp": 76, "pv": 45 },
+  { "id": 105, "name": "रेडी टू कुक बिर्याणी", "sp": 75, "pv": 45 },
+  { "id": 106, "name": "आवळा कॅन्डी गोड २०० GM", "sp": 85, "pv": 51 },
+  { "id": 107, "name": "आवळा कॅन्डी मसाला २०० GM", "sp": 70, "pv": 42 },
+  { "id": 108, "name": "करी पेस्ट ८० GM", "sp": 63, "pv": 38 },
+  { "id": 109, "name": "क्लासिक खाकरा २०० GM", "sp": 60, "pv": 30 },
+  { "id": 110, "name": "मेथी खाकरा २०० GM", "sp": 58, "pv": 29 },
+  { "id": 111, "name": "नुडल्स ७० GM", "sp": 20, "pv": 10 },
+  { "id": 112, "name": "चोको बार ३० GM", "sp": 30, "pv": 18 },
+  { "id": 113, "name": "फ्रुट बार ३० GM", "sp": 30, "pv": 18 },
+  { "id": 114, "name": "चहा पावडर (छोटी)५०० GM", "sp": 220, "pv": 110 },
+  { "id": 115, "name": "लाल चहा (मोठी) पावडर ५०० GM", "sp": 240, "pv": 120 },
+  { "id": 116, "name": "कॉफी ५० GM", "sp": 188, "pv": 113 },
+  { "id": 117, "name": "ग्रीन डीटोक्स टी ३६ GM", "sp": 78, "pv": 47 },
+  { "id": 118, "name": "गार्डनगोल्ड ५०० GM", "sp": 100, "pv": 75 },
+  { "id": 119, "name": "डायपर छोटे 20 नग ", "sp":199, "pv": 119 },
+  { "id": 120, "name": "डायपर मेडीयम  १६ नग", "sp": 199, "pv": 119 },
+  { "id": 121, "name": "डायपर मोठे  20  नग", "sp": 199, "pv": 119 }
+];
+
+export default function OrderCalculator() {
+  const [quantities, setQuantities] = useState({});
+
+  const handleQuantityChange = (id, value) => {
+    setQuantities({ ...quantities, [id]: parseInt(value) || 0 });
+  };
+
+  const totalSP = products.reduce((sum, p) => sum + (quantities[p.id] || 0) * p.sp, 0);
+  const totalPV = products.reduce((sum, p) => sum + (quantities[p.id] || 0) * p.pv, 0);
+  const consistencyFreeProduct = totalPV * 0.17;
+  const purchaserClubBonus = totalPV * 0.10;
+  const totalBonus = consistencyFreeProduct + purchaserClubBonus;
+  const netAmount = totalSP - totalPV * 0.27;
+
+  return (
+    <Card className="p-4 bg-gray-100 shadow-lg rounded-lg">
+      <CardContent>
+        <div className="mb-4 font-bold text-xl text-center bg-blue-200 p-3 rounded-lg flex justify-between items-center">
+          <div className="text-left">
+            <p className="text-blue-700">एकूण किंमत (SP): {totalSP}</p>
+            <p className="text-green-700">एकूण PV: {totalPV}</p>
+          </div>
+          <p className="text-orange-700 text-2xl font-extrabold text-center">एकूण बोनस: {totalBonus.toFixed(2)}</p>
+          <div className="text-right">
+            <p className="text-purple-700">Consistency Free Product (17% of PV): {consistencyFreeProduct.toFixed(2)}</p>
+            <p className="text-red-700">Purchaser Club Bonus (10% of PV): {purchaserClubBonus.toFixed(2)}</p>
+          </div>
+        </div>
+        <Table className="border border-gray-300">
+          <TableHeader className="bg-gray-300">
+            <TableRow>
+              <TableHead className="text-black">प्र. क्र.</TableHead>
+              <TableHead className="text-black">प्रॉडक्ट</TableHead>
+              <TableHead className="text-black">किंमत (SP)</TableHead>
+              <TableHead className="text-black">PV</TableHead>
+              <TableHead className="text-black">नग</TableHead>
+              <TableHead className="text-black">एकूण किंमत</TableHead>
+              <TableHead className="text-black">एकूण PV</TableHead>
+              <TableHead className="text-black">NET किंमत</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {products.map((p) => {
+              const totalProductPV = (quantities[p.id] || 0) * p.pv;
+              const netPrice = (quantities[p.id] || 0) * p.sp - totalProductPV * 0.27;
+              return (
+                <TableRow key={p.id} className="even:bg-gray-200 odd:bg-white">
+                  <TableCell className="font-semibold text-gray-700">{p.id}</TableCell>
+                  <TableCell className="font-semibold text-gray-700">{p.name}</TableCell>
+                  <TableCell className="text-blue-600">{p.sp}</TableCell>
+                  <TableCell className="text-green-600">{p.pv}</TableCell>
+                  <TableCell>
+                    <Input
+                      type="number"
+                      value={quantities[p.id] || ""}
+                      onChange={(e) => handleQuantityChange(p.id, e.target.value)}
+                      className="w-20 border border-gray-400 rounded p-1"
+                    />
+                  </TableCell>
+                  <TableCell className="text-blue-700">{(quantities[p.id] || 0) * p.sp}</TableCell>
+                  <TableCell className="text-green-700">{totalProductPV}</TableCell>
+                  <TableCell className="text-red-700 font-bold">{netPrice.toFixed(2)}</TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
