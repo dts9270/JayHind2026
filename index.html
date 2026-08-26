@@ -474,7 +474,7 @@ th{background:#eef4fb;color:var(--navy);position:sticky;top:0;z-index:1}
           <div class="card"><h3>Top Villages</h3><div id="reportVillageBars" class="bar-list"></div></div>
           <div class="card"><h3>Follow-up</h3><div id="followStats"></div></div>
         </div>
-        <div class="card" style="margin-top:12px"><h3>Exports</h3><div class="actions"><button class="btn primary" onclick="exportCSV()">⬇️ Export CSV</button><button class="btn ghost" onclick="backupJSON()">💾 Full JSON Backup</button></div></div>
+        <div class="card" style="margin-top:12px"><h3>Exports</h3><div class="actions"><button class="btn primary" onclick="exportCSV()">⬇️ Export CSV</button><button class="btn ghost" onclick="backupJSON()">💾 Full JSON Backup</button><button class="btn orange admin-only" onclick="printAllReportsAdmin()">📄 All Reports PDF</button></div></div>
       </section>
 
       <section id="archive" class="tab">
@@ -1448,6 +1448,47 @@ function previewCurrent(){if(requiredOK())showReport(collectScreen())}
 function closeReport(){$('reportModal').classList.remove('show')}
 function safeName(s){return String(s||'Patient').replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,'_')}
 function printReport(){if(!currentReport)return;const old=document.title;document.title=`RCM_Health_Report_${safeName(currentReport.name)}_${fmt(currentReport.campDate).replaceAll('/','-')}_T${currentReport.visitNo}`;window.print();setTimeout(()=>document.title=old,900)}
+
+function printAllReportsAdmin(){
+  if(portalSession?.role!=='admin'){toast('Admin permission आवश्यक आहे.');return}
+  if(!records.length){toast('Reports उपलब्ध नाहीत.');return}
+
+  const w=window.open('','_blank');
+  if(!w){toast('Popup blocked आहे. Browser मध्ये popups allow करा.');return}
+
+  const styleText=[...document.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  const pages=records.map((r,i)=>`<section class="report bulk-report-page">${reportHTML(r)}</section>`).join('');
+
+  w.document.open();
+  w.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RCM_Health_All_Reports_${records.length}</title>
+<style>
+${styleText}
+html,body{background:#fff!important;margin:0!important;padding:0!important}
+.bulk-report-page{width:100%;box-sizing:border-box;background:#fff}
+@media print{
+  @page{size:A4 portrait;margin:5mm}
+  body>*:not(.report-modal){display:block!important}
+  .bulk-report-page{display:block!important;page-break-after:always;break-after:page}
+  .bulk-report-page:last-child{page-break-after:auto;break-after:auto}
+}
+</style>
+</head>
+<body>${pages}</body>
+</html>`);
+  w.document.close();
+
+  const doPrint=()=>{
+    try{w.focus();w.print()}catch(e){console.warn(e)}
+  };
+  if(w.document.readyState==='complete')setTimeout(doPrint,500);
+  else w.addEventListener('load',()=>setTimeout(doPrint,500),{once:true});
+}
+
 function pdfCurrent(){if(requiredOK()){showReport(collectScreen());setTimeout(printReport,120)}}
 function printById(id){const r=records.find(x=>x.id===id);if(r){showReport(r);setTimeout(printReport,120)}}
 
