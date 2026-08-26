@@ -311,7 +311,7 @@ th{background:#eef4fb;color:var(--navy);position:sticky;top:0;z-index:1}
         <span class="status-pill" id="operatorPill">Operator: —</span>
         <span class="user-chip" id="loginUserChip">User: —</span>
         <button class="btn ghost sm" onclick="logoutPortal()">Logout</button>
-        <span class="status-pill" id="localSaveStatus">💾 Local Auto-Save ON</span>
+        <span class="status-pill" id="firebaseStatus">☁️ Firebase: Connecting...</span><span class="status-pill" id="localSaveStatus">💾 Local Auto-Save ON</span>
         <button class="btn primary sm" onclick="openCampModal(false)">➕ New Camp</button>
       </div>
     </header>
@@ -596,13 +596,89 @@ th{background:#eef4fb;color:var(--navy);position:sticky;top:0;z-index:1}
 <script>
 'use strict';
 
+let firebaseReady = false;
+let firebaseApplying = false;
+let firebasePushTimer = null;
+
+function firebasePayload(){
+  return {
+    camps,
+    records,
+    members,
+    settings,
+    currentCampId,
+    portalUsers: portalReadUsers(),
+    updatedAt: new Date().toISOString()
+  };
+}
+function setFirebaseStatus(text){
+  const el = document.getElementById('firebaseStatus');
+  if(el) el.textContent = text;
+}
+function scheduleFirebasePush(){
+  if(!firebaseReady || firebaseApplying || !window.firebaseBridge) return;
+  clearTimeout(firebasePushTimer);
+  firebasePushTimer = setTimeout(async()=>{
+    try{
+      await window.firebaseBridge.write(firebasePayload());
+      setFirebaseStatus('☁️ Firebase: Saved');
+    }catch(err){
+      console.warn('Firebase write error', err);
+      setFirebaseStatus('☁️ Firebase: Save failed');
+    }
+  }, 350);
+}
+function applyFirebaseData(data){
+  if(!data || typeof data !== 'object') return;
+  firebaseApplying = true;
+  if(Array.isArray(data.camps)) camps = data.camps;
+  if(Array.isArray(data.records)) records = data.records;
+  if(Array.isArray(data.members)) members = data.members;
+  if(data.settings && typeof data.settings === 'object') settings = {...settings, ...data.settings};
+  if(data.currentCampId) currentCampId = data.currentCampId;
+  if(Array.isArray(data.portalUsers)) localStorage.setItem(PORTAL_USERS_KEY, JSON.stringify(data.portalUsers));
+
+  localStorage.setItem(K.camps, JSON.stringify(camps));
+  localStorage.setItem(K.records, JSON.stringify(records));
+  localStorage.setItem(K.members, JSON.stringify(members));
+  localStorage.setItem(K.settings, JSON.stringify(settings));
+  localStorage.setItem(K.current, currentCampId || '');
+  firebaseApplying = false;
+
+  renderAll();
+  applyPortalAccess();
+}
+window.addEventListener('firebase-rtdb-ready', async()=>{
+  firebaseReady = true;
+  setFirebaseStatus('☁️ Firebase: Loading...');
+  try{
+    const remote = await window.firebaseBridge.read();
+    if(remote && (remote.camps || remote.records || remote.members || remote.portalUsers)){
+      applyFirebaseData(remote);
+      setFirebaseStatus('☁️ Firebase: Live');
+    }else{
+      await window.firebaseBridge.write(firebasePayload());
+      setFirebaseStatus('☁️ Firebase: First sync');
+    }
+    window.firebaseBridge.listen(data=>{
+      if(firebaseApplying) return;
+      applyFirebaseData(data);
+      setFirebaseStatus('☁️ Firebase: Live');
+    });
+  }catch(err){
+    console.warn('Firebase load error', err);
+    setFirebaseStatus('☁️ Firebase: Error');
+  }
+});
+
+
 const PORTAL_USERS_KEY='rcm_portal_users_v1';
 const PORTAL_SESSION_KEY='rcm_portal_session_v1';
 const DEFAULT_ADMIN_ID="7020970727";
 const DEFAULT_ADMIN_HASH="a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3";
 let portalSession=null;
 function portalReadUsers(){try{return JSON.parse(localStorage.getItem(PORTAL_USERS_KEY)||'[]')}catch{return[]}}
-function portalWriteUsers(users){localStorage.setItem(PORTAL_USERS_KEY,JSON.stringify(users))}
+function portalWriteUsers(users){localStorage.setItem(PORTAL_USERS_KEY,JSON.stringify(users));scheduleFirebasePush()}
 async function sha256Text(text){const data=new TextEncoder().encode(text);const hash=await crypto.subtle.digest('SHA-256',data);return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('')}
 function ensureDefaultAdmin(){const users=portalReadUsers();if(!users.some(u=>u.userId===DEFAULT_ADMIN_ID)){users.unshift({id:'admin-default',userId:DEFAULT_ADMIN_ID,name:'Admin',role:'admin',active:true,passHash:DEFAULT_ADMIN_HASH,createdAt:new Date().toISOString()});portalWriteUsers(users)}}
 function loadPortalSession(){try{portalSession=JSON.parse(sessionStorage.getItem(PORTAL_SESSION_KEY)||'null')}catch{portalSession=null}}
@@ -794,6 +870,7 @@ function persist(){
   localStorage.setItem('rcm_local_last_saved_at',new Date().toISOString());
   const el=document.getElementById('localSaveStatus');
   if(el) el.textContent='💾 Saved locally · '+new Date().toLocaleTimeString('mr-IN',{hour:'2-digit',minute:'2-digit'});
+  scheduleFirebasePush();
 }
 function toast(t){const x=$('toast');x.textContent=t;x.style.display='block';clearTimeout(window._tt);window._tt=setTimeout(()=>x.style.display='none',3000)}
 function camp(){return camps.find(c=>c.id===currentCampId)||null}
@@ -1483,5 +1560,27 @@ applyPortalAccess();
 (()=>{const t=localStorage.getItem('rcm_local_last_saved_at');const el=document.getElementById('localSaveStatus');if(t&&el){try{el.textContent='💾 Local data सुरक्षित · '+new Date(t).toLocaleString('mr-IN')}catch{}}})();
 $('loginPassword')?.addEventListener('keydown',e=>{if(e.key==='Enter')loginPortal()});
 </script>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-database.js";
+
+const firebaseConfig = {"apiKey": "AIzaSyAo9X0Dot55rgVRTywENrJmhi49dxmfjUA", "authDomain": "bloodcheck-5d119.firebaseapp.com", "databaseURL": "https://bloodcheck-5d119-default-rtdb.firebaseio.com", "projectId": "bloodcheck-5d119", "storageBucket": "bloodcheck-5d119.firebasestorage.app", "messagingSenderId": "576208783780", "appId": "1:576208783780:web:ef07814e8e48c6698d1931"};
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+const rootRef = ref(db, "rcmHealth");
+
+window.firebaseBridge = {
+  read: async () => {
+    const snap = await get(rootRef);
+    return snap.exists() ? snap.val() : null;
+  },
+  write: async (data) => set(rootRef, data),
+  listen: (cb) => onValue(rootRef, snap => cb(snap.exists() ? snap.val() : null))
+};
+
+window.dispatchEvent(new Event("firebase-rtdb-ready"));
+</script>
+
 </body>
 </html>
