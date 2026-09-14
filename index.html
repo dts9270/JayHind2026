@@ -429,6 +429,19 @@ function toast(msg){
   const t=$("toast");t.textContent=msg;t.style.display="block";
   clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",2600)
 }
+function withTimeout(promise,ms=12000,label="Firebase"){
+  return Promise.race([
+    promise,
+    new Promise((_,reject)=>setTimeout(()=>reject(new Error(label+" timeout")),ms))
+  ]);
+}
+function forceOnline(){
+  try{
+    if(db && typeof db.goOnline==="function") db.goOnline();
+    else if(firebase.database && typeof firebase.database().goOnline==="function") firebase.database().goOnline();
+  }catch(e){console.warn("goOnline failed",e)}
+}
+
 function pad(n){return String(n).padStart(2,"0")}
 function istDate(offsetDays=0){
   const parts=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Kolkata",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
@@ -529,6 +542,7 @@ function trialText(){
 try{
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   db=firebase.database();
+  forceOnline();
 
   db.ref(".info/connected").on("value", snap=>{
     connected = snap.val() === true;
@@ -536,7 +550,7 @@ try{
       $("cloudState").textContent="Database connected";
       $("cloudState").dataset.state="connected";
     }else{
-      $("cloudState").textContent="Database offline";
+      $("cloudState").textContent="Database reconnecting";
       $("cloudState").dataset.state="offline";
     }
   });
@@ -581,7 +595,7 @@ setInterval(()=>{
   const left=Math.max(0,Number(settings.openUntil||0)-Date.now());
   $("entryCountdown").value=settings.live&&left>0?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`:"—";
   $("statTime").textContent=settings.live&&left>0?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`:"—";
-  if(settings.live&&left<=0&&connected){
+  if(settings.live&&left<=0&&db){
     db.ref(`${ROOT}/settings/current/live`).set(false);
   }
 },1000);
@@ -636,6 +650,7 @@ $("publishQuestionsBtn").onclick=async()=>{
 
   try{
     if(!db) throw new Error("Firebase database initialize झालेली नाही.");
+    forceOnline();
     if(!Object.keys(parsedSets).length) parseBulk();
 
     if(!importedValid()){
@@ -689,10 +704,10 @@ $("publishQuestionsBtn").onclick=async()=>{
       updates["settings/current"]=readyState;
     }
 
-    await db.ref(ROOT).update(updates);
+    await withTimeout(db.ref(ROOT).update(updates),12000,"Publish");
 
     // Read-back verification: only mark Publish Done after Firebase confirms stored data.
-    const verifySnap=await db.ref(`${ROOT}/days/${date}/meta/publishedQuestionsAt`).once("value");
+    const verifySnap=await withTimeout(db.ref(`${ROOT}/days/${date}/meta/publishedQuestionsAt`).once("value"),12000,"Verify");
     if(Number(verifySnap.val())!==now){
       throw new Error("Firebase write verify झाला नाही.");
     }
@@ -737,9 +752,10 @@ $("publishQuestionsBtn").onclick=async()=>{
 ========================= */
 $("startAdminQuizBtn").onclick=async()=>{
   if(!confirm("Quiz सुरू केल्यावर 10 मिनिटांची Entry Window सुरू होईल. START करायचे?"))return;
+  forceOnline();
   try{
     const date=$("adminDate").value||istDate();
-    const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
+    const sets=(await withTimeout(db.ref(`${ROOT}/days/${date}/public/sets`).once("value"),12000,"Load Questions")).val();
     if(!sets||!Object.keys(sets).length){
       $("controlMsg").className="notice bad";
       $("controlMsg").textContent="❌ Published Questions सापडले नाहीत. आधी IMPORT → PUBLISH करा.";
@@ -753,7 +769,7 @@ $("startAdminQuizBtn").onclick=async()=>{
     }
     const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
     const liveState={quizDate:date,title,live:true,startedAt:Date.now(),openUntil:Date.now()+ENTRY_MINUTES*60*1000,questionsReady:true};
-    await db.ref(`${ROOT}/settings/current`).set(liveState);
+    await withTimeout(db.ref(`${ROOT}/settings/current`).set(liveState),12000,"Start Quiz");
     settings=liveState;
     updatePublicStatus();
     $("controlMsg").className="notice ok";
@@ -767,9 +783,10 @@ $("startAdminQuizBtn").onclick=async()=>{
 }
 
 $("closeAdminQuizBtn").onclick=async()=>{
-  if(!connected)return;
+  if(!db)return;
   try{
-    await db.ref(`${ROOT}/settings/current`).update({live:false,openUntil:Date.now()});
+    forceOnline();
+    await withTimeout(db.ref(`${ROOT}/settings/current`).update({live:false,openUntil:Date.now()}),12000,"Close Entry");
     settings={...settings,live:false,openUntil:Date.now()};
     updatePublicStatus();
     updateFlowStatus();
@@ -778,10 +795,7 @@ $("closeAdminQuizBtn").onclick=async()=>{
 }
 $("reloadAdminBtn").onclick=async()=>{
   await loadAdminDashboard();
-  if(!connected){
-    $("controlMsg").className="notice bad";
-    $("controlMsg").textContent="❌ Firebase connection/permission तपासा.";
-  }
+  
 };
 
 /* =========================
@@ -795,14 +809,15 @@ $("resumeBtn").onclick=async()=>{
 };
 
 async function beginParticipant(resumeOnly){
-  if(!connected)return toast("Database उपलब्ध नाही.");
+  if(!db)return toast("Database initialize झालेली नाही.");
+  forceOnline();
   const name=$("pName").value.trim(), mobile=safeMobile($("pMobile").value), cls=$("pClass").value;
   if(name.length<2)return toast("पूर्ण नाव भरा.");
   if(!/^[6-9]\d{9}$/.test(mobile))return toast("योग्य 10 अंकी मोबाईल नंबर भरा.");
 
   const date=settings.quizDate||istDate();
   const ref=db.ref(`${ROOT}/attempts/${date}/${mobile}`);
-  const old=(await ref.once("value")).val();
+  const old=(await withTimeout(ref.once("value"),12000,"Participant Check")).val();
 
   if(old){
     if(old.status==="submitted")return toast("या नंबरवरून Quiz आधीच submit झाला आहे.");
@@ -814,7 +829,7 @@ async function beginParticipant(resumeOnly){
   if(resumeOnly)return toast("या मोबाईल नंबरसाठी started attempt सापडला नाही.");
   if(!settings.live||Date.now()>=Number(settings.openUntil||0))return toast("नवीन Entry बंद आहे.");
 
-  const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
+  const sets=(await withTimeout(db.ref(`${ROOT}/days/${date}/public/sets`).once("value"),12000,"Load Quiz")).val();
   if(!sets)return toast("Questions उपलब्ध नाहीत.");
   const setNames=Object.keys(sets);
   const setName=setNames[Math.floor(Math.random()*setNames.length)];
@@ -828,13 +843,13 @@ async function beginParticipant(resumeOnly){
     name,mobile,className:cls,setName,status:"started",startedAt:Date.now(),
     currentIndex:0,questionStartedAt:Date.now(),questionOrder,optionOrders,answers:{}
   };
-  await ref.set(attempt);
+  await withTimeout(ref.set(attempt),12000,"Start Attempt");
   localStorage.setItem("ganpati_active",JSON.stringify({date,mobile}));
   resumeAttempt(attempt,date,mobile);
 }
 
 async function resumeAttempt(attempt,date,mobile){
-  const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
+  const sets=(await withTimeout(db.ref(`${ROOT}/days/${date}/public/sets`).once("value"),12000,"Load Quiz")).val();
   if(!sets||!sets[attempt.setName])return toast("Question set उपलब्ध नाही.");
   activeAttempt={...attempt,date,mobile};
   activeAttempt.questionOrder=normalizeList(attempt.questionOrder);
@@ -885,7 +900,7 @@ async function answerQuestion(qi,chosen){
   updates[`answers/${qi}`]=chosen===null?"BLANK":chosen;
   updates["currentIndex"]=nextIndex;
   updates["questionStartedAt"]=Date.now();
-  await db.ref(`${ROOT}/attempts/${date}/${mobile}`).update(updates);
+  await withTimeout(db.ref(`${ROOT}/attempts/${date}/${mobile}`).update(updates),12000,"Save Answer");
   activeAttempt.answers=activeAttempt.answers||{};
   activeAttempt.answers[qi]=chosen===null?"BLANK":chosen;
   activeAttempt.currentIndex=nextIndex;
@@ -898,9 +913,9 @@ async function submitAttempt(){
   clearInterval(qTimer);
   const submittedAt=Date.now();
   const elapsedMs=submittedAt-Number(activeAttempt.startedAt||submittedAt);
-  await db.ref(`${ROOT}/attempts/${activeAttempt.date}/${activeAttempt.mobile}`).update({
+  await withTimeout(db.ref(`${ROOT}/attempts/${activeAttempt.date}/${activeAttempt.mobile}`).update({
     status:"submitted",submittedAt,elapsedMs,currentIndex:10
-  });
+  }),12000,"Submit Quiz");
   localStorage.removeItem("ganpati_active");
   showOnly("doneView");
   $("doneMeta").innerHTML=`दिनांक: <b>${prettyDate(activeAttempt.date)}</b><br>नाव: <b>${esc(activeAttempt.name)}</b><br>Quiz Time: <b>${fmtDuration(elapsedMs)}</b>`;
@@ -969,7 +984,8 @@ document.querySelectorAll(".tab").forEach(btn=>btn.onclick=()=>{
    ADMIN DASHBOARD / LIVE
 ========================= */
 async function loadAdminDashboard(){
-  if(!connected)return;
+  if(!db)return;
+  forceOnline();
   const date=$("adminDate").value||istDate();
   const [meta,att,pub]=await Promise.all([
     db.ref(`${ROOT}/days/${date}/meta`).once("value"),
