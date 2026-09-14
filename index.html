@@ -106,55 +106,61 @@ th{background:#fff2db;position:sticky;top:0}
     <h1>जय हिंद गणेश मित्र मंडळ</h1>
     <p>Online प्रश्नमंजुषा • ज्ञान • वेग • अचूकता</p>
     <div class="badges">
-      <span class="badge">आज Trial Mode</span>
       <span class="badge">10 प्रश्न</span>
       <span class="badge">30 सेकंद / प्रश्न</span>
-      <span class="badge">उद्यापासून 4 Random Sets Ready</span>
+      <span class="badge">एक मोबाईल • एक प्रयत्न</span>
     </div>
   </section>
 
-  <div id="cloudState" class="notice"><span class="dot"></span> Firebase जोडत आहे...</div>
+  <div id="cloudState" class="small muted" style="text-align:center;margin-top:8px">Connecting...</div>
 
   <!-- PUBLIC HOME -->
   <section id="homeView" class="card">
     <div class="center">
-      <h2 style="margin:0 0 6px">🙏 गणपती बाप्पा मोरया!</h2>
+      <h2 style="margin:0 0 8px">🙏 गणपती बाप्पा मोरया!</h2>
       <div id="publicStatus" class="notice">आजची प्रश्नमंजुषा अजून सुरू झालेली नाही.</div>
     </div>
 
-    <div class="grid" style="margin-top:14px">
-      <div>
-        <label>पूर्ण नाव</label>
-        <input id="pName" maxlength="60" placeholder="उदा. राहुल देशमुख">
+    <div class="notice" id="rulesBox">
+      <b>स्पर्धेचे नियम</b><br>
+      1. एकूण 10 प्रश्न.<br>
+      2. प्रत्येक प्रश्नासाठी 30 सेकंद.<br>
+      3. एकदा पुढे गेल्यावर मागे जाता येणार नाही.<br>
+      4. एक मोबाईल नंबर = एकच प्रयत्न.
+    </div>
+
+    <div id="entryForm" class="hidden">
+      <div class="grid" style="margin-top:14px">
+        <div>
+          <label>पूर्ण नाव</label>
+          <input id="pName" maxlength="60" placeholder="उदा. राहुल देशमुख">
+        </div>
+        <div>
+          <label>मोबाईल नंबर</label>
+          <input id="pMobile" inputmode="numeric" maxlength="10" placeholder="10 अंकी नंबर">
+        </div>
+        <div>
+          <label>इयत्ता</label>
+          <select id="pClass">
+            <option value="10वी">10वी</option>
+            <option value="11वी">11वी</option>
+            <option value="12वी">12वी</option>
+            <option value="इतर">इतर</option>
+          </select>
+        </div>
+        <div>
+          <label>उरलेला Entry Time</label>
+          <input id="entryCountdown" value="—" readonly>
+        </div>
       </div>
-      <div>
-        <label>मोबाईल नंबर</label>
-        <input id="pMobile" inputmode="numeric" maxlength="10" placeholder="10 अंकी नंबर">
-      </div>
-      <div>
-        <label>इयत्ता</label>
-        <select id="pClass">
-          <option value="10वी">10वी</option>
-          <option value="11वी">11वी</option>
-          <option value="12वी">12वी</option>
-          <option value="इतर">इतर</option>
-        </select>
-      </div>
-      <div>
-        <label>Entry Remaining</label>
-        <input id="entryCountdown" value="—" readonly>
+      <div class="actions">
+        <button id="startBtn" class="btn green">▶ START QUIZ</button>
+        <button id="resumeBtn" class="btn light">↩ Resume</button>
       </div>
     </div>
 
-    <div class="actions">
-      <button id="startBtn" class="btn green" disabled>▶ START QUIZ</button>
-      <button id="resumeBtn" class="btn light">↩ Resume Existing Quiz</button>
-      <button id="myResultBtn" class="btn saffron">🏆 My Result</button>
-    </div>
-
-    <div class="notice">
-      Quiz सुरू झाल्यावर एकावेळी एकच प्रश्न दिसेल. प्रत्येक प्रश्नाला 30 सेकंद. Back नाही.
-      उत्तर न दिल्यास प्रश्न auto-next होईल.
+    <div class="actions" style="justify-content:center">
+      <button id="myResultBtn" class="btn saffron">🏆 कालचा निकाल</button>
     </div>
   </section>
 
@@ -170,14 +176,13 @@ th{background:#fff2db;position:sticky;top:0}
     <div class="progress"><i id="progressBar"></i></div>
     <div id="questionText" class="question"></div>
     <div id="options" class="options"></div>
-    <div class="notice">⏱️ वेळ संपल्यास unanswered mark होऊन पुढचा प्रश्न आपोआप येईल.</div>
   </section>
 
   <!-- SUBMITTED -->
   <section id="doneView" class="card hidden center">
     <div style="font-size:62px">✅</div>
     <h2>उत्तरे यशस्वीरीत्या जमा झाली!</h2>
-    <p>योग्य उत्तरे आणि score सध्या दाखवले जाणार नाहीत.</p>
+    <p>निकाल जाहीर झाल्यानंतर “कालचा निकाल” मध्ये पाहता येईल.</p>
     <div id="doneMeta" class="notice ok"></div>
     <div class="actions" style="justify-content:center">
       <button class="btn saffron" onclick="showMyResult()">🏆 My Result</button>
@@ -374,7 +379,7 @@ const firebaseConfig = {
   appId: "1:867000105496:web:fb8f32217b0ab213f5a16d"
 };
 
-const ROOT = "ganpati_quiz_v2";
+const ROOT = "ganpati_quiz_v1";
 const ADMIN_PIN = "9270688372";
 const ENTRY_MINUTES = 10;
 const QUESTION_SECONDS = 30;
@@ -421,6 +426,11 @@ function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&l
 function fmtDuration(ms){const s=Math.max(0,Math.round((ms||0)/1000));return `${Math.floor(s/60)}:${pad(s%60)}`}
 function fmtTime(ts){return ts?new Date(ts).toLocaleTimeString("mr-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—"}
 function shuffle(a){const x=[...a];for(let i=x.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[x[i],x[j]]=[x[j],x[i]]}return x}
+function normalizeList(v){
+  if(Array.isArray(v)) return v.filter(x=>x!==null&&x!==undefined);
+  if(v&&typeof v==="object") return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);
+  return [];
+}
 function answerIndex(letter){return ["A","B","C","D"].indexOf(String(letter).trim().toUpperCase())}
 function setActivePipeline(key){
   ["pReady","pNotStarted","pLive","pClosed","pResult"].forEach(id=>$(id).classList.remove("active"));
@@ -456,16 +466,14 @@ function trialText(){
 try{
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
   db=firebase.database(); connected=true;
-  $("cloudState").innerHTML='<span class="dot live"></span><b>Online Database Ready</b> • dsveggies-65411';
-  $("cloudState").classList.add("ok");
+  $("cloudState").textContent='● Online';
   db.ref(`${ROOT}/settings/current`).on("value",s=>{
     settings=s.val()||{quizDate:"",title:"",live:false,openUntil:0};
     updatePublicStatus(); updateAdminStatus();
   });
 }catch(e){
   console.error(e);
-  $("cloudState").textContent="⚠ Firebase जोडता आली नाही. Database Rules तपासा.";
-  $("cloudState").classList.add("bad");
+  $("cloudState").textContent='● Offline';
 }
 
 $("adminDate").value=istDate();
@@ -478,13 +486,16 @@ $("rDate").value=yesterdayIST();
 function updatePublicStatus(){
   const now=Date.now(), live=!!settings.live && now<Number(settings.openUntil||0);
   const s=$("publicStatus");
+  const form=$("entryForm");
   if(live){
     s.className="notice ok";
-    s.innerHTML=`🟢 <b>Quiz LIVE आहे.</b> Entry सुरू आहे.`;
+    s.innerHTML=`🟢 <b>प्रश्नमंजुषा सुरू आहे</b>`;
+    form.classList.remove("hidden");
     $("startBtn").disabled=false;
   }else{
     s.className="notice";
-    s.innerHTML=`🔒 <b>Quiz सध्या सुरू नाही.</b> Admin START QUIZ दाबल्यानंतरच entry सुरू होईल.`;
+    s.innerHTML=`🔒 <b>प्रश्नमंजुषा अजून सुरू झालेली नाही</b>`;
+    form.classList.add("hidden");
     $("startBtn").disabled=true;
   }
 }
@@ -532,7 +543,7 @@ function renderPreview(){
   const box=$("questionPreview");box.innerHTML="";
   Object.entries(parsedSets).forEach(([set,qs])=>{
     const d=document.createElement("div");d.className="set-card";
-    d.innerHTML=`<h3>Set ${set} • ${qs.length} प्रश्न</h3>`+qs.map((q,i)=>`<div class="preview-q"><b>${i+1}.</b> ${esc(q.q)}<br><span class="small muted">Correct: ${["A","B","C","D"][q.answer]} • ${esc(q.explanation)}</span></div>`).join("");
+    d.innerHTML=`<h3>Set ${set} • ${qs.length} प्रश्न</h3>`+qs.map((q,i)=>`<div class="preview-q"><b>${i+1}.</b> ${esc(q.q)}</div>`).join("");
     box.appendChild(d);
   });
   if(!Object.keys(parsedSets).length) box.innerHTML='<div class="notice bad">Valid format सापडला नाही.</div>';
@@ -548,13 +559,25 @@ $("publishQuestionsBtn").onclick=async()=>{
     publicSets[set]=qs.map((q,i)=>({id:q.id||`Q${i+1}`,q:q.q,options:q.options}));
     privateKeys[set]=qs.map(q=>({answer:q.answer,explanation:q.explanation}));
   }
-  await Promise.all([
-    db.ref(`${ROOT}/days/${date}/public/sets`).set(publicSets),
-    db.ref(`${ROOT}/days/${date}/private/answerKeys`).set(privateKeys),
-    db.ref(`${ROOT}/days/${date}/meta`).update({title:$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा",publishedQuestionsAt:Date.now(),setCount:Object.keys(publicSets).length})
-  ]);
-  toast("Questions Publish झाले ✅");
-  loadAdminDashboard();
+  try{
+    const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
+    await Promise.all([
+      db.ref(`${ROOT}/days/${date}/public/sets`).set(publicSets),
+      db.ref(`${ROOT}/days/${date}/private/answerKeys`).set(privateKeys),
+      db.ref(`${ROOT}/days/${date}/meta`).update({title,publishedQuestionsAt:Date.now(),setCount:Object.keys(publicSets).length})
+    ]);
+    if(!(settings.live && settings.quizDate===date)){
+      const readyState={quizDate:date,title,live:false,openUntil:0,questionsReady:true};
+      await db.ref(`${ROOT}/settings/current`).set(readyState);
+      settings=readyState;
+      updatePublicStatus();
+    }
+    toast("Questions Publish झाले ✅");
+    loadAdminDashboard();
+  }catch(err){
+    console.error(err);
+    toast("Publish failed: Firebase Rules/Internet तपासा");
+  }
 }
 
 /* =========================
@@ -562,30 +585,44 @@ $("publishQuestionsBtn").onclick=async()=>{
 ========================= */
 $("startAdminQuizBtn").onclick=async()=>{
   if(!confirm("Quiz सुरू केल्यावर 10 मिनिटांची Entry Window सुरू होईल. START करायचे?"))return;
-  const date=$("adminDate").value||istDate();
-  const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
-  if(!sets||!Object.keys(sets).length)return toast("आधी Questions Publish करा.");
-  const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
-  await db.ref(`${ROOT}/settings/current`).set({
-    quizDate:date,title,live:true,startedAt:Date.now(),openUntil:Date.now()+ENTRY_MINUTES*60*1000
-  });
-  $("controlMsg").className="notice ok";
-  $("controlMsg").textContent="Quiz LIVE आहे. नवीन entries 10 मिनिटांसाठी सुरू आहेत.";
-  toast("Quiz START झाला 🟢");
+  try{
+    const date=$("adminDate").value||istDate();
+    const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
+    if(!sets||!Object.keys(sets).length)return toast("आधी Questions Publish करा.");
+    const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
+    const liveState={quizDate:date,title,live:true,startedAt:Date.now(),openUntil:Date.now()+ENTRY_MINUTES*60*1000,questionsReady:true};
+    await db.ref(`${ROOT}/settings/current`).set(liveState);
+    settings=liveState;
+    updatePublicStatus();
+    $("controlMsg").className="notice ok";
+    $("controlMsg").textContent="Quiz LIVE आहे. नवीन entries 10 मिनिटांसाठी सुरू आहेत.";
+    toast("Quiz START झाला 🟢");
+  }catch(err){
+    console.error(err);
+    toast("START failed: Firebase Rules/Internet तपासा");
+  }
 }
 
 $("closeAdminQuizBtn").onclick=async()=>{
   if(!connected)return;
-  await db.ref(`${ROOT}/settings/current`).update({live:false,openUntil:Date.now()});
-  toast("Entry Closed");
+  try{
+    await db.ref(`${ROOT}/settings/current`).update({live:false,openUntil:Date.now()});
+    settings={...settings,live:false,openUntil:Date.now()};
+    updatePublicStatus();
+    toast("Entry Closed");
+  }catch(err){console.error(err);toast("Close failed: Firebase Rules तपासा")}
 }
 $("reloadAdminBtn").onclick=loadAdminDashboard;
 
 /* =========================
    PARTICIPANT START/RESUME
 ========================= */
-$("startBtn").onclick=()=>beginParticipant(false);
-$("resumeBtn").onclick=()=>beginParticipant(true);
+$("startBtn").onclick=async()=>{
+  try{await beginParticipant(false)}catch(err){console.error(err);toast("Quiz सुरू झाला नाही: Firebase/Internet तपासा")}
+};
+$("resumeBtn").onclick=async()=>{
+  try{await beginParticipant(true)}catch(err){console.error(err);toast("Resume झाला नाही: Firebase/Internet तपासा")}
+};
 
 async function beginParticipant(resumeOnly){
   if(!connected)return toast("Database उपलब्ध नाही.");
@@ -611,7 +648,8 @@ async function beginParticipant(resumeOnly){
   if(!sets)return toast("Questions उपलब्ध नाहीत.");
   const setNames=Object.keys(sets);
   const setName=setNames[Math.floor(Math.random()*setNames.length)];
-  const qs=sets[setName];
+  const qs=normalizeList(sets[setName]);
+  if(qs.length!==10)return toast("या Set मध्ये 10 प्रश्न उपलब्ध नाहीत.");
   const questionOrder=shuffle(qs.map((_,i)=>i));
   const optionOrders={};
   questionOrder.forEach(qi=>optionOrders[qi]=shuffle([0,1,2,3]));
@@ -629,7 +667,11 @@ async function resumeAttempt(attempt,date,mobile){
   const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
   if(!sets||!sets[attempt.setName])return toast("Question set उपलब्ध नाही.");
   activeAttempt={...attempt,date,mobile};
-  activeQuestions=sets[attempt.setName];
+  activeAttempt.questionOrder=normalizeList(attempt.questionOrder);
+  activeAttempt.optionOrders=attempt.optionOrders||{};
+  activeQuestions=normalizeList(sets[attempt.setName]);
+  if(activeQuestions.length!==10)return toast("Question Set अपूर्ण आहे.");
+  if(activeAttempt.questionOrder.length!==10) activeAttempt.questionOrder=[0,1,2,3,4,5,6,7,8,9];
   qIndex=Number(attempt.currentIndex||0);
   showOnly("quizView");
   $("participantName").textContent=`${attempt.name} • ${attempt.className||""}`;
@@ -641,12 +683,13 @@ function renderActiveQuestion(){
   if(qIndex>=10)return submitAttempt();
   const qi=activeAttempt.questionOrder[qIndex];
   const q=activeQuestions[qi];
-  const order=activeAttempt.optionOrders[qi]||[0,1,2,3];
+  const order=normalizeList(activeAttempt.optionOrders[qi]);
+  const safeOrder=order.length===4?order:[0,1,2,3];
   $("qCounter").textContent=`प्रश्न ${qIndex+1} / 10`;
   $("progressBar").style.width=`${(qIndex/10)*100}%`;
   $("questionText").textContent=q.q;
   $("options").innerHTML="";
-  order.forEach(origIdx=>{
+  safeOrder.forEach(origIdx=>{
     const b=document.createElement("button");b.className="opt";
     b.textContent=q.options[origIdx];
     b.onclick=()=>answerQuestion(qi,origIdx);
@@ -814,7 +857,8 @@ async function computeResults(date){
   let rows=[];
   for(const a of Object.values(attempts)){
     if(!a||a.status!=="submitted")continue;
-    const qs=sets[a.setName]||[], key=keys[a.setName]||[];
+    const qs=normalizeList(sets[a.setName]);
+    const key=normalizeList(keys[a.setName]);
     let score=0; const review=[];
     for(let i=0;i<qs.length;i++){
       const selected=(a.answers||{})[i];
