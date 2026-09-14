@@ -528,15 +528,29 @@ function trialText(){
 ========================= */
 try{
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  db=firebase.database(); connected=true;
-  $("cloudState").textContent='● Online';
+  db=firebase.database();
+
+  db.ref(".info/connected").on("value", snap=>{
+    connected = snap.val() === true;
+    if(connected){
+      $("cloudState").textContent="Database connected";
+      $("cloudState").dataset.state="connected";
+    }else{
+      $("cloudState").textContent="Database offline";
+      $("cloudState").dataset.state="offline";
+    }
+  });
+
   db.ref(`${ROOT}/settings/current`).on("value",s=>{
     settings=s.val()||{quizDate:"",title:"",live:false,openUntil:0};
     updatePublicStatus(); updateAdminStatus(); updateFlowStatus();
+  }, err=>{
+    console.error("SETTINGS READ ERROR", err);
+    connected=false;
   });
 }catch(e){
-  console.error(e);
-  $("cloudState").textContent='● Offline';
+  console.error("FIREBASE INIT ERROR",e);
+  connected=false;
 }
 
 $("adminDate").value=istDate();
@@ -617,37 +631,104 @@ function renderPreview(){
 }
 
 $("publishQuestionsBtn").onclick=async()=>{
-  if(!connected)return toast("Firebase जोडलेले नाही.");
-  if(!Object.keys(parsedSets).length) parseBulk();
-  const date=$("adminDate").value||istDate();
-  const publicSets={}, privateKeys={};
-  for(const [set,qs] of Object.entries(parsedSets)){
-    if(qs.length!==10) return toast(`Set ${set} मध्ये नेमके 10 प्रश्न असावेत.`);
-    publicSets[set]=qs.map((q,i)=>({id:q.id||`Q${i+1}`,q:q.q,options:q.options}));
-    privateKeys[set]=qs.map(q=>({answer:q.answer,explanation:q.explanation}));
-  }
+  const btn=$("publishQuestionsBtn");
+  const oldText=btn.textContent;
+
   try{
-    const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
-    await Promise.all([
-      db.ref(`${ROOT}/days/${date}/public/sets`).set(publicSets),
-      db.ref(`${ROOT}/days/${date}/private/answerKeys`).set(privateKeys),
-      db.ref(`${ROOT}/days/${date}/meta`).update({title,publishedQuestionsAt:Date.now(),setCount:Object.keys(publicSets).length})
-    ]);
-    if(!(settings.live && settings.quizDate===date)){
-      const readyState={quizDate:date,title,live:false,openUntil:0,questionsReady:true};
-      await db.ref(`${ROOT}/settings/current`).set(readyState);
-      settings=readyState;
-      updatePublicStatus();
+    if(!db) throw new Error("Firebase database initialize झालेली नाही.");
+    if(!Object.keys(parsedSets).length) parseBulk();
+
+    if(!importedValid()){
+      throw new Error("IMPORT पूर्ण नाही. Set मध्ये नेमके 10 प्रश्न असणे आवश्यक आहे.");
     }
+
+    btn.disabled=true;
+    btn.textContent="Publishing...";
+    $("controlMsg").className="notice";
+    $("controlMsg").textContent="② प्रश्न Firebase मध्ये Publish होत आहेत...";
+
+    const date=$("adminDate").value||istDate();
+    const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
+    const publicSets={}, privateKeys={};
+
+    for(const [set,qs] of Object.entries(parsedSets)){
+      publicSets[set]=qs.map((q,i)=>({
+        id:q.id||`Q${i+1}`,
+        q:q.q,
+        options:q.options
+      }));
+      privateKeys[set]=qs.map(q=>({
+        answer:q.answer,
+        explanation:q.explanation||""
+      }));
+    }
+
+    const now=Date.now();
+    const readyState={
+      quizDate:date,
+      title,
+      live:false,
+      openUntil:0,
+      questionsReady:true,
+      questionsPublishedAt:now
+    };
+
+    // One atomic write under the quiz root.
+    const updates={};
+    updates[`days/${date}/public/sets`]=publicSets;
+    updates[`days/${date}/private/answerKeys`]=privateKeys;
+    updates[`days/${date}/meta`]={
+      title,
+      publishedQuestionsAt:now,
+      setCount:Object.keys(publicSets).length,
+      questionCount:Object.values(publicSets).reduce((n,qs)=>n+qs.length,0)
+    };
+
+    // Do not interrupt an already-live quiz.
+    if(!(settings.live && settings.quizDate===date)){
+      updates["settings/current"]=readyState;
+    }
+
+    await db.ref(ROOT).update(updates);
+
+    // Read-back verification: only mark Publish Done after Firebase confirms stored data.
+    const verifySnap=await db.ref(`${ROOT}/days/${date}/meta/publishedQuestionsAt`).once("value");
+    if(Number(verifySnap.val())!==now){
+      throw new Error("Firebase write verify झाला नाही.");
+    }
+
     adminQuestionsReady=true;
+    if(!(settings.live && settings.quizDate===date)){
+      settings=readyState;
+    }
+
     $("controlMsg").className="notice ok";
-    $("controlMsg").textContent="① IMPORT DONE ✅  •  ② PUBLISH DONE ✅  आता ③ START QUIZ दाबा.";
+    $("controlMsg").textContent="① IMPORT DONE ✅  •  ② PUBLISH DONE ✅  •  आता ③ START QUIZ दाबा.";
     updateFlowStatus();
-    toast("Questions Publish झाले ✅");
-    loadAdminDashboard();
+    updatePublicStatus();
+    toast("PUBLISH DONE ✅");
+    await loadAdminDashboard();
+
   }catch(err){
-    console.error(err);
-    toast("Publish failed: Firebase Rules/Internet तपासा");
+    console.error("PUBLISH ERROR",err);
+    adminQuestionsReady=false;
+    $("controlMsg").className="notice bad";
+
+    const code=(err && err.code)?String(err.code):"";
+    let msg=err && err.message ? err.message : "Unknown error";
+
+    if(code.includes("PERMISSION_DENIED") || /permission/i.test(msg)){
+      msg="Firebase Permission Denied — Realtime Database Rules Publish करा.";
+    }else if(/network|offline|disconnected/i.test(msg)){
+      msg="Internet/Firebase connection उपलब्ध नाही.";
+    }
+
+    $("controlMsg").innerHTML=`❌ <b>PUBLISH FAILED</b><br>${esc(msg)}`;
+    toast("Publish Failed ❌");
+    updateFlowStatus();
+  }finally{
+    btn.textContent=oldText;
+    btn.disabled=!importedValid();
   }
 }
 
@@ -659,7 +740,17 @@ $("startAdminQuizBtn").onclick=async()=>{
   try{
     const date=$("adminDate").value||istDate();
     const sets=(await db.ref(`${ROOT}/days/${date}/public/sets`).once("value")).val();
-    if(!sets||!Object.keys(sets).length)return toast("आधी Questions Publish करा.");
+    if(!sets||!Object.keys(sets).length){
+      $("controlMsg").className="notice bad";
+      $("controlMsg").textContent="❌ Published Questions सापडले नाहीत. आधी IMPORT → PUBLISH करा.";
+      return toast("आधी Questions Publish करा.");
+    }
+    const badSet=Object.entries(sets).find(([_,qs])=>!qs || Object.keys(qs).length!==10);
+    if(badSet){
+      $("controlMsg").className="notice bad";
+      $("controlMsg").textContent=`❌ Set ${badSet[0]} मध्ये 10 प्रश्न नाहीत.`;
+      return;
+    }
     const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
     const liveState={quizDate:date,title,live:true,startedAt:Date.now(),openUntil:Date.now()+ENTRY_MINUTES*60*1000,questionsReady:true};
     await db.ref(`${ROOT}/settings/current`).set(liveState);
@@ -685,7 +776,13 @@ $("closeAdminQuizBtn").onclick=async()=>{
     toast("Entry Closed");
   }catch(err){console.error(err);toast("Close failed: Firebase Rules तपासा")}
 }
-$("reloadAdminBtn").onclick=loadAdminDashboard;
+$("reloadAdminBtn").onclick=async()=>{
+  await loadAdminDashboard();
+  if(!connected){
+    $("controlMsg").className="notice bad";
+    $("controlMsg").textContent="❌ Firebase connection/permission तपासा.";
+  }
+};
 
 /* =========================
    PARTICIPANT START/RESUME
@@ -883,7 +980,8 @@ async function loadAdminDashboard(){
   const vals=Object.values(attempts);
   $("statStarted").textContent=vals.filter(x=>x.status==="started").length;
   $("statSubmitted").textContent=vals.filter(x=>x.status==="submitted").length;
-  const ready=meta.exists();
+  const metaVal=meta.val()||{};
+  const ready=!!metaVal.publishedQuestionsAt;
   adminQuestionsReady=ready;
   const isLive=settings.quizDate===date&&settings.live&&Date.now()<Number(settings.openUntil||0);
   $("statStatus").textContent=isLive?"LIVE":ready?"READY":"NOT READY";
