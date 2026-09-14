@@ -392,7 +392,7 @@ th{background:#fff2db;position:sticky;top:0}
 const firebaseConfig = {
   apiKey: "AIzaSyB9UDUKGU-OS9gZ6W6V7IXOXUuM2wJo12E",
   authDomain: "dsveggies-65411.firebaseapp.com",
-  databaseURL: "https://dsveggies-65411-default-rtdb.firebaseio.com",
+  databaseURL: "https://dsveggies-65411-default-rtdb.firebaseio.com/",
   projectId: "dsveggies-65411",
   storageBucket: "dsveggies-65411.firebasestorage.app",
   messagingSenderId: "867000105496",
@@ -442,7 +442,7 @@ function forceOnline(){
   }catch(e){console.warn("goOnline failed",e)}
 }
 
-const ACTIVE_DB_BASE = firebaseConfig.databaseURL.replace(/\/$/,"");
+const ACTIVE_DB_BASE = "https://dsveggies-65411-default-rtdb.firebaseio.com";
 
 function dbUrl(path=""){
   const clean=String(path||"").replace(/^\/+|\/+$/g,"");
@@ -450,73 +450,85 @@ function dbUrl(path=""){
   return `${ACTIVE_DB_BASE}/${ROOT}${encoded?"/"+encoded:""}.json`;
 }
 
-function ensureHostedPage(){
-  const protocol=window.location.protocol;
-  if(protocol!=="http:" && protocol!=="https:"){
-    throw new Error("LOCAL_FILE_MODE");
-  }
+function isHosted(){
+  return window.location.protocol==="http:" || window.location.protocol==="https:";
 }
 
 async function restRequest(path,method="GET",body){
-  ensureHostedPage();
-
   const opts={
     method,
     cache:"no-store",
-    headers:{"Content-Type":"text/plain;charset=UTF-8"}
+    headers:{"Content-Type":"application/json;charset=UTF-8"}
   };
   if(body!==undefined) opts.body=JSON.stringify(body);
 
-  const res=await withTimeout(fetch(dbUrl(path),opts),12000,"Database");
+  const res=await withTimeout(fetch(dbUrl(path),opts),12000,"Firebase");
   const text=await res.text();
 
   if(!res.ok){
     let detail=text;
     try{
-      const j=JSON.parse(text);
-      detail=j.error||text;
+      const parsed=JSON.parse(text);
+      detail=parsed.error||text;
     }catch(e){}
-    throw new Error(`Database ${res.status}: ${detail}`);
+    throw new Error(`Firebase ${res.status}: ${detail}`);
   }
 
   if(!text) return null;
   try{return JSON.parse(text)}catch(e){return text}
 }
 
+async function sdkGet(path){
+  if(!db) throw new Error("Firebase SDK unavailable");
+  forceOnline();
+  const refPath=`${ROOT}/${String(path||"").replace(/^\/+|\/+$/g,"")}`;
+  return (await withTimeout(db.ref(refPath).once("value"),10000,"Firebase SDK read")).val();
+}
+async function sdkSet(path,value){
+  if(!db) throw new Error("Firebase SDK unavailable");
+  forceOnline();
+  const refPath=`${ROOT}/${String(path||"").replace(/^\/+|\/+$/g,"")}`;
+  return await withTimeout(db.ref(refPath).set(value),10000,"Firebase SDK write");
+}
+async function sdkUpdate(path,value){
+  if(!db) throw new Error("Firebase SDK unavailable");
+  forceOnline();
+  const refPath=`${ROOT}/${String(path||"").replace(/^\/+|\/+$/g,"")}`;
+  return await withTimeout(db.ref(refPath).update(value),10000,"Firebase SDK update");
+}
+async function sdkRemove(path){
+  if(!db) throw new Error("Firebase SDK unavailable");
+  forceOnline();
+  const refPath=`${ROOT}/${String(path||"").replace(/^\/+|\/+$/g,"")}`;
+  return await withTimeout(db.ref(refPath).remove(),10000,"Firebase SDK delete");
+}
+
 async function dataGet(path){
   try{return await restRequest(path,"GET")}
   catch(restErr){
-    console.warn("REST read fallback",restErr);
-    forceOnline();
-    if(!db) throw restErr;
-    return (await withTimeout(db.ref(`${ROOT}/${path}`.replace(/\/$/,"")).once("value"),7000,"SDK read")).val();
+    console.warn("REST GET failed, trying SDK",restErr);
+    return await sdkGet(path);
   }
 }
 async function dataSet(path,value){
   try{return await restRequest(path,"PUT",value)}
   catch(restErr){
-    console.warn("REST write fallback",restErr);
-    forceOnline();
-    if(!db) throw restErr;
-    return await withTimeout(db.ref(`${ROOT}/${path}`.replace(/\/$/,"")).set(value),7000,"SDK write");
+    console.warn("REST PUT failed, trying SDK",restErr);
+    return await sdkSet(path,value);
   }
 }
 async function dataUpdate(path,value){
   try{return await restRequest(path,"PATCH",value)}
   catch(restErr){
-    console.warn("REST update fallback",restErr);
-    forceOnline();
-    if(!db) throw restErr;
-    return await withTimeout(db.ref(`${ROOT}/${path}`.replace(/\/$/,"")).update(value),7000,"SDK update");
+    console.warn("REST PATCH failed, trying SDK",restErr);
+    return await sdkUpdate(path,value);
   }
 }
 async function dataRemove(path){
   try{return await restRequest(path,"DELETE")}
   catch(restErr){
-    console.warn("REST delete fallback",restErr);
-    forceOnline();
-    if(!db) throw restErr;
-    return await withTimeout(db.ref(`${ROOT}/${path}`.replace(/\/$/,"")).remove(),7000,"SDK remove");
+    console.warn("REST DELETE failed, trying SDK",restErr);
+    return await sdkRemove(path);
   }
 }
 
@@ -659,13 +671,13 @@ async function syncSettingsFallback(){
 setInterval(()=>{ if(!connected) syncSettingsFallback(); },3000);
 
 
-(function checkLocalOpen(){
-  const protocol=window.location.protocol;
-  if(protocol!=="http:" && protocol!=="https:"){
+
+(function checkOpenMode(){
+  if(!isHosted()){
     const s=$("publicStatus");
     if(s){
       s.className="notice bad";
-      s.innerHTML="⚠️ ही फाईल Downloads मधून उघडली आहे. Quiz चालवण्यासाठी GitHub Pages ची https:// link वापरा.";
+      s.innerHTML="⚠️ Firebase Quiz चालवण्यासाठी ही फाईल GitHub Pages च्या https:// link वरून उघडा.";
     }
   }
 })();
@@ -757,10 +769,10 @@ $("publishQuestionsBtn").onclick=async()=>{
     btn.disabled=true;
     btn.textContent="② Publishing...";
     $("controlMsg").className="notice";
-    $("controlMsg").textContent="② Database शोधत आहे → Questions Publish होत आहेत...";
+    $("controlMsg").textContent="② Firebase वर Questions Publish होत आहेत...";
 
     $("controlMsg").className="notice";
-    $("controlMsg").textContent="② Database connected → Questions Publish होत आहेत...";
+    $("controlMsg").textContent="② Firebase वर Questions Publish होत आहेत...";
     const date=$("adminDate").value||istDate();
     const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
     const publicSets={}, privateKeys={};
@@ -813,10 +825,10 @@ $("publishQuestionsBtn").onclick=async()=>{
     let msg=err&&err.message?err.message:"Unknown error";
     if(/permission|401|403/i.test(msg)){
       msg="Firebase Rules access block करत आहेत. Rules Publish झालेत का ते तपासा.";
-    }else if(/endpoint सापडला नाही/i.test(msg)){
-      msg="Firebase Database URL/Region detect झाला नाही. Realtime Database → Data मधील database URL तपासा.";
-    }else if(/failed to fetch|network|timeout|offline|abort/i.test(msg)){
-      msg="Firebase network connect होत नाही. Mobile network / Private DNS / VPN तपासा.";
+    }else if(/failed to fetch|network|timeout|offline|abort|Firebase SDK/i.test(msg)){
+      msg=isHosted()
+        ?"Firebase connect होत नाही. Internet आणि Realtime Database तपासा."
+        :"ही HTML Downloads मधून उघडली आहे. GitHub Pages च्या https:// link वरून उघडा.";
     }
     $("controlMsg").className="notice bad";
     $("controlMsg").innerHTML=`❌ <b>PUBLISH FAILED</b><br>${esc(msg)}`;
@@ -834,7 +846,6 @@ $("publishQuestionsBtn").onclick=async()=>{
 $("startAdminQuizBtn").onclick=async()=>{
   if(!confirm("Quiz सुरू केल्यावर 10 मिनिटांची Entry Window सुरू होईल. START करायचे?"))return;
   forceOnline();
-  try{ await resolveDatabaseBase(); }catch(e){ $("controlMsg").className="notice bad"; $("controlMsg").textContent="❌ Database connect होत नाही."; return; }
   try{
     const date=$("adminDate").value||istDate();
     const sets=await dataGet(`days/${date}/public/sets`);
@@ -1051,7 +1062,7 @@ $("adminBtn").onclick=()=>{
   if(pin===ADMIN_PIN){
     showOnly("adminView");
     loadAdminDashboard();
-    if(window.location.protocol!=="http:" && window.location.protocol!=="https:"){
+    if(!isHosted()){
       $("controlMsg").className="notice bad";
       $("controlMsg").textContent="⚠️ Local Downloads mode. Firebase Publish साठी GitHub Pages ची https:// link उघडा.";
     }
