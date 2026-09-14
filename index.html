@@ -96,6 +96,19 @@ th{background:#fff2db;position:sticky;top:0}
 .footer{text-align:center;color:#7c7368;font-size:12px;margin:24px 0}
 .codehint{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#f7f2ec;padding:10px;border-radius:12px;overflow:auto}
 .small{font-size:12px}
+
+.flowbox{margin-top:14px;border:1px solid var(--line);border-radius:20px;padding:14px;background:#fffefb}
+.flowtitle{font-size:18px;font-weight:950;margin-bottom:10px}
+.flowgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.flowstep{border:1px solid var(--line);border-radius:16px;padding:12px;background:#faf7f1;min-width:0}
+.flowstep.done{background:#eaf8ee;border-color:#b8dfbf}
+.flowstep.live{background:#e8f7ee;border-color:#8fd0a0}
+.flowstep.pending{background:#fff6e8;border-color:#efd3a3}
+.flowicon{font-size:26px;line-height:1}
+.flowname{font-weight:950;margin-top:5px}
+.flowstate{font-size:13px;color:var(--muted);margin-top:2px}
+@media(max-width:680px){.flowgrid{grid-template-columns:1fr}}
+
 </style>
 </head>
 
@@ -231,7 +244,7 @@ th{background:#fff2db;position:sticky;top:0}
       <button id="logoutAdmin" class="btn light">बाहेर पडा</button>
     </div>
 
-    <div class="pipeline" id="pipeline">
+    <div class="pipeline hidden" id="pipeline">
       <span class="pipe" id="pReady">QUESTIONS READY</span>
       <span class="pipe" id="pNotStarted">QUIZ NOT STARTED</span>
       <span class="pipe" id="pLive">QUIZ LIVE</span>
@@ -241,7 +254,6 @@ th{background:#fff2db;position:sticky;top:0}
 
     <div class="admin-tabs" style="margin-top:14px">
       <button class="tab active" data-tab="dashboardTab">Dashboard</button>
-      <button class="tab" data-tab="questionsTab">Questions</button>
       <button class="tab" data-tab="liveTab">Live Attempts</button>
       <button class="tab" data-tab="resultsTab">Results</button>
       <button class="tab" data-tab="archiveTab">Archive</button>
@@ -249,11 +261,26 @@ th{background:#fff2db;position:sticky;top:0}
 
     <!-- DASHBOARD -->
     <div id="dashboardTab" class="admin-panel">
-      <div class="grid4" style="margin-top:14px">
-        <div class="stat"><span>Started</span><b id="statStarted">0</b></div>
-        <div class="stat"><span>Submitted</span><b id="statSubmitted">0</b></div>
-        <div class="stat"><span>Status</span><b id="statStatus" style="font-size:20px">NOT STARTED</b></div>
-        <div class="stat"><span>Entry Left</span><b id="statTime" style="font-size:20px">—</b></div>
+
+      <div class="flowbox">
+        <div class="flowtitle">आजचा Quiz Flow</div>
+        <div class="flowgrid">
+          <div id="flowImport" class="flowstep pending">
+            <div id="flowImportIcon" class="flowicon">⏳</div>
+            <div class="flowname">1. IMPORT</div>
+            <div id="flowImportText" class="flowstate">Pending</div>
+          </div>
+          <div id="flowPublish" class="flowstep pending">
+            <div id="flowPublishIcon" class="flowicon">🔒</div>
+            <div class="flowname">2. PUBLISH</div>
+            <div id="flowPublishText" class="flowstate">Pending</div>
+          </div>
+          <div id="flowStart" class="flowstep pending">
+            <div id="flowStartIcon" class="flowicon">🔒</div>
+            <div class="flowname">3. START QUIZ</div>
+            <div id="flowStartText" class="flowstate">Not Started</div>
+          </div>
+        </div>
       </div>
 
       <div class="grid" style="margin-top:14px">
@@ -267,43 +294,36 @@ th{background:#fff2db;position:sticky;top:0}
         </div>
       </div>
 
+      <label style="margin-top:14px">Questions Paste करा</label>
+      <textarea id="bulkQuestions" rows="10" placeholder="SET A&#10;Q1|प्रश्न|A|B|C|D|योग्य पर्याय|स्पष्टीकरण"></textarea>
+
       <div class="actions">
-        <button id="startAdminQuizBtn" class="btn green">▶ START QUIZ • 10 मिनिटे</button>
-        <button id="closeAdminQuizBtn" class="btn red">■ CLOSE ENTRY</button>
-        <button id="reloadAdminBtn" class="btn light">↻ Reload</button>
+        <button id="trialFillBtn" class="btn saffron">🧪 आजचे Trial Questions</button>
+        <button id="importBtn" class="btn light">① IMPORT</button>
+        <button id="publishQuestionsBtn" class="btn gold">② PUBLISH</button>
+        <button id="startAdminQuizBtn" class="btn green">③ START QUIZ • 10 मिनिटे</button>
       </div>
+
       <div id="controlMsg" class="notice">
-        प्रश्न आधी Publish करा. START QUIZ दाबेपर्यंत participant ला प्रश्न दिसणार नाहीत.
+        क्रम: IMPORT → PUBLISH → START QUIZ
+      </div>
+
+      <div id="questionPreview" class="grid" style="margin-top:14px"></div>
+
+      <div class="grid4" style="margin-top:14px">
+        <div class="stat"><span>Started</span><b id="statStarted">0</b></div>
+        <div class="stat"><span>Submitted</span><b id="statSubmitted">0</b></div>
+        <div class="stat"><span>Status</span><b id="statStatus" style="font-size:20px">NOT STARTED</b></div>
+        <div class="stat"><span>Entry Left</span><b id="statTime" style="font-size:20px">—</b></div>
+      </div>
+
+      <div class="actions">
+        <button id="closeAdminQuizBtn" class="btn red">■ CLOSE ENTRY</button>
+        <button id="reloadAdminBtn" class="btn light">↻ Reload Status</button>
       </div>
     </div>
 
     <!-- QUESTIONS -->
-    <div id="questionsTab" class="admin-panel hidden">
-      <div class="notice">
-        <b>सोप्पा मार्ग:</b> मी रोज देणारा पूर्ण मजकूर इथे एकदाच Paste करा → Import → Preview → Publish.
-        आज Trial असल्यामुळे खाली “आजचे Trial Questions” button दिला आहे.
-      </div>
-
-      <label style="margin-top:14px">One-Paste Question Import</label>
-      <textarea id="bulkQuestions" rows="12" placeholder="SET A&#10;Q1|प्रश्न|A पर्याय|B पर्याय|C पर्याय|D पर्याय|C|स्पष्टीकरण"></textarea>
-
-      <div class="actions">
-        <button id="trialFillBtn" class="btn saffron">🧪 आजचे Trial Questions भरा</button>
-        <button id="importBtn" class="btn light">📥 Import / Preview</button>
-        <button id="publishQuestionsBtn" class="btn green">🚀 Publish Questions</button>
-      </div>
-
-      <div class="codehint">
-Format:
-SET A
-Q1|प्रश्न?|पर्याय A|पर्याय B|पर्याय C|पर्याय D|C|एका ओळीत explanation
-...
-SET B
-...
-      </div>
-
-      <div id="questionPreview" class="grid" style="margin-top:14px"></div>
-    </div>
 
     <!-- LIVE -->
     <div id="liveTab" class="admin-panel hidden">
@@ -389,6 +409,7 @@ let settings={quizDate:"",title:"",live:false,openUntil:0};
 let parsedSets={};
 let activeAttempt=null, activeQuestions=[], qIndex=0, qTimer=null;
 let resultsCache=[];
+let adminQuestionsReady=false;
 
 /* =========================
    HELPERS
@@ -433,8 +454,50 @@ function normalizeList(v){
 }
 function answerIndex(letter){return ["A","B","C","D"].indexOf(String(letter).trim().toUpperCase())}
 function setActivePipeline(key){
-  ["pReady","pNotStarted","pLive","pClosed","pResult"].forEach(id=>$(id).classList.remove("active"));
-  if(key) $(key).classList.add("active");
+  ["pReady","pNotStarted","pLive","pClosed","pResult"].forEach(id=>{
+    const el=$(id); if(el) el.classList.remove("active");
+  });
+  const target=key?$(key):null; if(target) target.classList.add("active");
+}
+
+
+function importedValid(){
+  const entries=Object.values(parsedSets||{});
+  return entries.length>0 && entries.every(qs=>Array.isArray(qs)&&qs.length===10);
+}
+function paintFlow(id,iconId,textId,state,icon,text){
+  const box=$(id), ic=$(iconId), tx=$(textId);
+  if(!box||!ic||!tx)return;
+  box.classList.remove("done","live","pending");
+  box.classList.add(state);
+  ic.textContent=icon; tx.textContent=text;
+}
+function updateFlowStatus(){
+  const date=$("adminDate")?.value||istDate();
+  const imported=importedValid() || adminQuestionsReady;
+  const published=adminQuestionsReady;
+  const sameDay=settings.quizDate===date;
+  const live=sameDay && !!settings.live && Date.now()<Number(settings.openUntil||0);
+  const started=sameDay && !!settings.startedAt;
+
+  paintFlow("flowImport","flowImportIcon","flowImportText",
+    imported?"done":"pending", imported?"✅":"⏳", imported?"Done":"Pending");
+
+  paintFlow("flowPublish","flowPublishIcon","flowPublishText",
+    published?"done":"pending", published?"✅":"🔒", published?"Done":"Pending");
+
+  if(live){
+    paintFlow("flowStart","flowStartIcon","flowStartText","live","🟢","LIVE");
+  }else if(started){
+    paintFlow("flowStart","flowStartIcon","flowStartText","done","✅","Started • Entry Closed");
+  }else{
+    paintFlow("flowStart","flowStartIcon","flowStartText","pending","🔒","Not Started");
+  }
+
+  const pubBtn=$("publishQuestionsBtn");
+  const startBtnAdmin=$("startAdminQuizBtn");
+  if(pubBtn) pubBtn.disabled=!importedValid();
+  if(startBtnAdmin) startBtnAdmin.disabled=!published || live;
 }
 
 /* =========================
@@ -469,7 +532,7 @@ try{
   $("cloudState").textContent='● Online';
   db.ref(`${ROOT}/settings/current`).on("value",s=>{
     settings=s.val()||{quizDate:"",title:"",live:false,openUntil:0};
-    updatePublicStatus(); updateAdminStatus();
+    updatePublicStatus(); updateAdminStatus(); updateFlowStatus();
   });
 }catch(e){
   console.error(e);
@@ -478,6 +541,7 @@ try{
 
 $("adminDate").value=istDate();
 $("resultAdminDate").value=istDate();
+$("adminDate").addEventListener("change",()=>{loadAdminDashboard();updateFlowStatus();});
 $("rDate").value=yesterdayIST();
 
 /* =========================
@@ -536,7 +600,10 @@ function parseBulk(){
   parsedSets=sets;
   renderPreview();
   const count=Object.values(sets).reduce((n,a)=>n+a.length,0);
+  $("controlMsg").className="notice ok";
+  $("controlMsg").textContent="① IMPORT DONE ✅  आता ② PUBLISH दाबा.";
   toast(`${Object.keys(sets).length} Set • ${count} प्रश्न Import झाले`);
+  updateFlowStatus();
 }
 
 function renderPreview(){
@@ -572,6 +639,10 @@ $("publishQuestionsBtn").onclick=async()=>{
       settings=readyState;
       updatePublicStatus();
     }
+    adminQuestionsReady=true;
+    $("controlMsg").className="notice ok";
+    $("controlMsg").textContent="① IMPORT DONE ✅  •  ② PUBLISH DONE ✅  आता ③ START QUIZ दाबा.";
+    updateFlowStatus();
     toast("Questions Publish झाले ✅");
     loadAdminDashboard();
   }catch(err){
@@ -595,7 +666,8 @@ $("startAdminQuizBtn").onclick=async()=>{
     settings=liveState;
     updatePublicStatus();
     $("controlMsg").className="notice ok";
-    $("controlMsg").textContent="Quiz LIVE आहे. नवीन entries 10 मिनिटांसाठी सुरू आहेत.";
+    $("controlMsg").textContent="① IMPORT ✅  •  ② PUBLISH ✅  •  ③ START ✅  — Quiz LIVE आहे.";
+    updateFlowStatus();
     toast("Quiz START झाला 🟢");
   }catch(err){
     console.error(err);
@@ -609,6 +681,7 @@ $("closeAdminQuizBtn").onclick=async()=>{
     await db.ref(`${ROOT}/settings/current`).update({live:false,openUntil:Date.now()});
     settings={...settings,live:false,openUntil:Date.now()};
     updatePublicStatus();
+    updateFlowStatus();
     toast("Entry Closed");
   }catch(err){console.error(err);toast("Close failed: Firebase Rules तपासा")}
 }
@@ -811,6 +884,7 @@ async function loadAdminDashboard(){
   $("statStarted").textContent=vals.filter(x=>x.status==="started").length;
   $("statSubmitted").textContent=vals.filter(x=>x.status==="submitted").length;
   const ready=meta.exists();
+  adminQuestionsReady=ready;
   const isLive=settings.quizDate===date&&settings.live&&Date.now()<Number(settings.openUntil||0);
   $("statStatus").textContent=isLive?"LIVE":ready?"READY":"NOT READY";
   if(pub.exists()&&pub.val().published)setActivePipeline("pResult");
@@ -818,6 +892,7 @@ async function loadAdminDashboard(){
   else if(ready&&settings.quizDate===date&&settings.startedAt)setActivePipeline("pClosed");
   else if(ready)setActivePipeline("pReady");
   else setActivePipeline("pNotStarted");
+  updateFlowStatus();
 }
 function updateAdminStatus(){if(!$("adminView").classList.contains("hidden"))loadAdminDashboard()}
 $("refreshLiveBtn").onclick=loadLive;
