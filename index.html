@@ -301,7 +301,7 @@ th{background:#fff2db;position:sticky;top:0}
         <button id="trialFillBtn" class="btn saffron">🧪 आजचे Trial Questions</button>
         <button id="importBtn" class="btn light">① IMPORT</button>
         <button id="publishQuestionsBtn" class="btn gold">② PUBLISH</button>
-        <button id="startAdminQuizBtn" class="btn green">③ START QUIZ • 10 मिनिटे</button>
+        <button id="startAdminQuizBtn" class="btn green">③ START QUIZ • 20 मिनिटे</button>
       </div>
 
       <div id="controlMsg" class="notice">
@@ -401,7 +401,7 @@ const firebaseConfig = {
 
 const ROOT = "ganpati_quiz_v1";
 const ADMIN_PIN = "9270688372";
-const ENTRY_MINUTES = 10;
+const ENTRY_MINUTES = 20;
 const QUESTION_SECONDS = 30;
 
 let db=null, connected=false;
@@ -841,7 +841,7 @@ $("publishQuestionsBtn").onclick=async()=>{
    ADMIN QUIZ CONTROL
 ========================= */
 $("startAdminQuizBtn").onclick=async()=>{
-  if(!confirm("Quiz सुरू केल्यावर 10 मिनिटांची Entry Window सुरू होईल. START करायचे?"))return;
+  if(!confirm("Quiz सुरू केल्यावर 20 मिनिटांची Entry Window सुरू होईल. START करायचे?"))return;
   forceOnline();
   try{
     const date=$("adminDate").value||istDate();
