@@ -390,13 +390,13 @@ th{background:#fff2db;position:sticky;top:0}
    FIREBASE + BASIC SETTINGS
 ========================= */
 const firebaseConfig = {
-  apiKey: "AIzaSyB9UDUKGU-OS9gZ6W6V7IXOXUuM2wJo12E",
-  authDomain: "dsveggies-65411.firebaseapp.com",
-  databaseURL: "https://dsveggies-65411-default-rtdb.firebaseio.com/",
-  projectId: "dsveggies-65411",
-  storageBucket: "dsveggies-65411.firebasestorage.app",
-  messagingSenderId: "867000105496",
-  appId: "1:867000105496:web:fb8f32217b0ab213f5a16d"
+  apiKey: "AIzaSyC1j9852pQ6Kud2B6BmR-kk7dvOEfM7baQ",
+  authDomain: "jayhind-39f11.firebaseapp.com",
+  databaseURL: "https://jayhind-39f11-default-rtdb.firebaseio.com/",
+  projectId: "jayhind-39f11",
+  storageBucket: "jayhind-39f11.firebasestorage.app",
+  messagingSenderId: "428406174353",
+  appId: "1:428406174353:web:e116610f5721403eed0530"
 };
 
 const ROOT = "ganpati_quiz_v1";
@@ -442,7 +442,7 @@ function forceOnline(){
   }catch(e){console.warn("goOnline failed",e)}
 }
 
-const ACTIVE_DB_BASE = "https://dsveggies-65411-default-rtdb.firebaseio.com";
+const ACTIVE_DB_BASE = "https://jayhind-39f11-default-rtdb.firebaseio.com";
 
 function dbUrl(path=""){
   const clean=String(path||"").replace(/^\/+|\/+$/g,"");
@@ -768,9 +768,6 @@ $("publishQuestionsBtn").onclick=async()=>{
 
     btn.disabled=true;
     btn.textContent="② Publishing...";
-    $("controlMsg").className="notice";
-    $("controlMsg").textContent="② Firebase वर Questions Publish होत आहेत...";
-
     $("controlMsg").className="notice";
     $("controlMsg").textContent="② Firebase वर Questions Publish होत आहेत...";
     const date=$("adminDate").value||istDate();
