@@ -1,4 +1,4 @@
-ho<!doctype html>
+<!doctype html>
 <html lang="mr">
 <head>
 <meta charset="utf-8">
@@ -8,6 +8,8 @@ ho<!doctype html>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
 :root{
@@ -97,6 +99,19 @@ th{background:#fff2db;position:sticky;top:0}
 .codehint{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#f7f2ec;padding:10px;border-radius:12px;overflow:auto}
 .small{font-size:12px}
 
+.photo-wrap{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.photo-preview{
+  width:112px;height:112px;border-radius:18px;object-fit:cover;
+  border:2px solid #e4d7c7;background:#f7f1e8;display:none
+}
+.photo-preview.show{display:block}
+.photo-mini{
+  width:46px;height:46px;border-radius:10px;object-fit:cover;
+  border:1px solid #ddd;background:#f4eee5
+}
+.photo-note{font-size:12px;color:var(--muted);line-height:1.45}
+
+
 .flowbox{margin-top:14px;border:1px solid var(--line);border-radius:20px;padding:14px;background:#fffefb}
 .flowtitle{font-size:18px;font-weight:950;margin-bottom:10px}
 .flowgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
@@ -139,7 +154,8 @@ th{background:#fff2db;position:sticky;top:0}
       1. एकूण 10 प्रश्न.<br>
       2. प्रत्येक प्रश्नासाठी 30 सेकंद.<br>
       3. एकदा पुढे गेल्यावर मागे जाता येणार नाही.<br>
-      4. एक मोबाईल नंबर = एकच प्रयत्न.
+      4. एक मोबाईल नंबर = एकच प्रयत्न.<br>
+      5. नाव, मोबाईल व चेहरा स्पष्ट दिसणारा फोटो आवश्यक.
     </div>
 
     <div id="entryForm" class="hidden">
@@ -155,11 +171,26 @@ th{background:#fff2db;position:sticky;top:0}
         <div>
           <label>इयत्ता</label>
           <select id="pClass">
+            <option value="5वी">5वी</option>
+            <option value="6वी">6वी</option>
+            <option value="7वी">7वी</option>
+            <option value="8वी">8वी</option>
+            <option value="9वी">9वी</option>
             <option value="10वी">10वी</option>
             <option value="11वी">11वी</option>
             <option value="12वी">12वी</option>
             <option value="इतर">इतर</option>
           </select>
+        </div>
+        <div>
+          <label>फोटो</label>
+          <div class="photo-wrap">
+            <div style="flex:1;min-width:210px">
+              <input id="pPhoto" type="file" accept="image/*" capture="user">
+              <div class="photo-note">मोबाईलवर Camera उघडून live photo घेता येईल. फोटो 320×320 PNG मध्ये save होईल आणि त्यावर नाव व मोबाईल stamp होईल.</div>
+            </div>
+            <img id="pPhotoPreview" class="photo-preview" alt="Photo preview">
+          </div>
         </div>
         <div>
           <label>उरलेला Entry Time</label>
@@ -301,7 +332,7 @@ th{background:#fff2db;position:sticky;top:0}
         <button id="trialFillBtn" class="btn saffron">🧪 आजचे Trial Questions</button>
         <button id="importBtn" class="btn light">① IMPORT</button>
         <button id="publishQuestionsBtn" class="btn gold">② PUBLISH</button>
-        <button id="startAdminQuizBtn" class="btn green">③ START QUIZ • 20 मिनिटे</button>
+        <button id="startAdminQuizBtn" class="btn green">③ START QUIZ • 1 तास</button>
       </div>
 
       <div id="controlMsg" class="notice">
@@ -332,7 +363,7 @@ th{background:#fff2db;position:sticky;top:0}
       </div>
       <div class="tablewrap" style="margin-top:12px">
         <table>
-          <thead><tr><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
+          <thead><tr><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
           <tbody id="liveBody"></tbody>
         </table>
       </div>
@@ -354,6 +385,8 @@ th{background:#fff2db;position:sticky;top:0}
 
       <div class="actions">
         <button id="exportCsvBtn" class="btn gold">⬇ CSV Export</button>
+        <button id="pdfReportBtn" class="btn saffron">📄 JAY HIND Colour PDF Report</button>
+        <button id="shortPdfBtn" class="btn green">🖨 Short Print PDF</button>
       </div>
 
       <h3>Top 3</h3>
@@ -362,7 +395,7 @@ th{background:#fff2db;position:sticky;top:0}
       <div class="tablewrap" style="margin-top:14px">
         <table>
           <thead>
-            <tr><th>Rank</th><th>नाव</th><th>मोबाईल</th><th>Class</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
+            <tr><th>Rank</th><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>Class</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
@@ -401,7 +434,7 @@ const firebaseConfig = {
 
 const ROOT = "ganpati_quiz_v1";
 const ADMIN_PIN = "9270688372";
-const ENTRY_MINUTES = 20;
+const ENTRY_MINUTES = 60;
 const QUESTION_SECONDS = 30;
 
 let db=null, connected=false;
@@ -410,6 +443,8 @@ let parsedSets={};
 let activeAttempt=null, activeQuestions=[], qIndex=0, qTimer=null;
 let resultsCache=[];
 let adminQuestionsReady=false;
+let participantPhotoPng="";
+let participantPhotoRaw="";
 
 /* =========================
    HELPERS
@@ -421,6 +456,22 @@ window.showHome=()=>{showOnly("homeView"); updatePublicStatus()}
 window.showMyResult=()=>{
   showOnly("resultView");
   $("rDate").value=yesterdayIST();
+$("pPhoto").addEventListener("change",async e=>{
+  try{
+    const file=e.target.files&&e.target.files[0];
+    if(!file){clearParticipantPhoto();return}
+    participantPhotoRaw=await fileToDataUrl(file);
+    await updateParticipantPhotoPreview();
+    toast("फोटो तयार झाला ✅");
+  }catch(err){
+    console.error(err);
+    clearParticipantPhoto();
+    toast(err.message||"फोटो process झाला नाही.");
+  }
+});
+$("pName").addEventListener("input",()=>{ if(participantPhotoRaw) updateParticipantPhotoPreview().catch(console.error); });
+$("pMobile").addEventListener("input",()=>{ if(participantPhotoRaw) updateParticipantPhotoPreview().catch(console.error); });
+
   $("resultDateLabel").textContent=`Default: ${prettyDate(yesterdayIST())} • कालची प्रश्नमंजुषा`;
   const m=$("pMobile").value.trim(); if(m) $("rMobile").value=m;
   const n=$("pName").value.trim(); if(n) $("rName3").value=n.slice(0,3);
@@ -556,6 +607,97 @@ function normalizeList(v){
   return [];
 }
 function answerIndex(letter){return ["A","B","C","D"].indexOf(String(letter).trim().toUpperCase())}
+
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=()=>reject(new Error("फोटो वाचता आला नाही."));
+    r.readAsDataURL(file);
+  });
+}
+function loadImage(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error("फोटो उघडता आला नाही."));
+    img.src=src;
+  });
+}
+async function stampPhotoDataUrl(src,size=320,name="",mobile=""){
+  const img=await loadImage(src);
+  if(img.naturalWidth<180 || img.naturalHeight<180){
+    throw new Error("फोटोची quality कमी आहे. चेहरा स्पष्ट दिसणारा फोटो घ्या.");
+  }
+
+  const side=Math.min(img.naturalWidth,img.naturalHeight);
+  const sx=(img.naturalWidth-side)/2;
+  const sy=(img.naturalHeight-side)/2;
+
+  const canvas=document.createElement("canvas");
+  canvas.width=size; canvas.height=size;
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,size,size);
+  ctx.drawImage(img,sx,sy,side,side,0,0,size,size);
+
+  const stripH=58;
+  ctx.fillStyle="rgba(255,255,255,.86)";
+  ctx.fillRect(0,size-stripH,size,stripH);
+  ctx.fillStyle="#111";
+  ctx.textBaseline="top";
+  const nm=(name||"नाम").trim().slice(0,24);
+  const mob=(mobile||"मोबाईल").trim().slice(0,10);
+  ctx.font="bold 17px system-ui, sans-serif";
+  ctx.fillText(nm,10,size-stripH+8,size-20);
+  ctx.font="bold 14px system-ui, sans-serif";
+  ctx.fillText(mob,10,size-stripH+31,size-20);
+
+  return canvas.toDataURL("image/png");
+}
+async function updateParticipantPhotoPreview(){
+  if(!participantPhotoRaw) return;
+  const name=$("pName").value.trim();
+  const mobile=safeMobile($("pMobile").value);
+  participantPhotoPng=await stampPhotoDataUrl(participantPhotoRaw,320,name,mobile);
+  const preview=$("pPhotoPreview");
+  preview.src=participantPhotoPng;
+  preview.classList.add("show");
+}
+function clearParticipantPhoto(){
+  participantPhotoPng="";
+  participantPhotoRaw="";
+  const input=$("pPhoto");
+  const preview=$("pPhotoPreview");
+  if(input) input.value="";
+  if(preview){
+    preview.removeAttribute("src");
+    preview.classList.remove("show");
+  }
+}
+
+async function chooseBalancedSet(date,sets){
+  const setNames=Object.keys(sets||{}).sort();
+  if(!setNames.length) throw new Error("Question sets उपलब्ध नाहीत.");
+
+  const counts=Object.fromEntries(setNames.map(s=>[s,0]));
+  try{
+    const attempts=(await dataGet(`attempts/${date}`))||{};
+    Object.values(attempts).forEach(a=>{
+      const setName=a&&a.setName;
+      if(setName && Object.prototype.hasOwnProperty.call(counts,setName)){
+        counts[setName]++;
+      }
+    });
+  }catch(e){
+    console.warn("Set balance count read failed; using equal pool",e);
+  }
+
+  const minUsed=Math.min(...setNames.map(s=>counts[s]));
+  const leastUsed=setNames.filter(s=>counts[s]===minUsed);
+  return leastUsed[Math.floor(Math.random()*leastUsed.length)];
+}
+
 function setActivePipeline(key){
   ["pReady","pNotStarted","pLive","pClosed","pResult"].forEach(id=>{
     const el=$(id); if(el) el.classList.remove("active");
@@ -690,26 +832,59 @@ $("rDate").value=yesterdayIST();
 /* =========================
    PUBLIC STATUS + ENTRY
 ========================= */
+function getSavedActiveAttempt(){
+  try{
+    const saved=JSON.parse(localStorage.getItem("ganpati_active")||"null");
+    return saved&&saved.mobile?saved:null;
+  }catch(e){return null}
+}
+
 function updatePublicStatus(){
-  const now=Date.now(), live=!!settings.live && now<Number(settings.openUntil||0);
+  const now=Date.now();
+  const live=!!settings.live && now<Number(settings.openUntil||0);
+  const started=!!settings.startedAt;
+  const saved=getSavedActiveAttempt();
+
   const s=$("publicStatus");
   const form=$("entryForm");
+  const startBtn=$("startBtn");
+  const resumeBtn=$("resumeBtn");
+
   if(live){
     s.className="notice ok";
-    s.innerHTML=`🟢 <b>प्रश्नमंजुषा सुरू आहे</b>`;
+    s.innerHTML=`🟢 <b>प्रश्नमंजुषा सुरू आहे</b><br><span class="small">नवीन Entry सुरू आहे.</span>`;
     form.classList.remove("hidden");
-    $("startBtn").disabled=false;
+    startBtn.classList.remove("hidden");
+    startBtn.disabled=false;
+    resumeBtn.classList.remove("hidden");
+  }else if(started || saved){
+    s.className="notice";
+    s.innerHTML=`🔒 <b>आजची नवीन Entry बंद झाली आहे.</b><br><span class="small">Quiz आधी सुरू केला असेल तर मोबाईल नंबर टाकून Resume करा.</span>`;
+    form.classList.remove("hidden");
+    startBtn.classList.add("hidden");
+    startBtn.disabled=true;
+    resumeBtn.classList.remove("hidden");
+
+    if(saved&&saved.mobile&&!$("pMobile").value.trim()){
+      $("pMobile").value=saved.mobile;
+    }
   }else{
     s.className="notice";
-    s.innerHTML=`🔒 <b>प्रश्नमंजुषा अजून सुरू झालेली नाही</b>`;
+    s.innerHTML=`🔒 <b>प्रश्नमंजुषा अजून सुरू झालेली नाही.</b>`;
     form.classList.add("hidden");
-    $("startBtn").disabled=true;
+    startBtn.classList.remove("hidden");
+    startBtn.disabled=true;
+    resumeBtn.classList.remove("hidden");
   }
 }
 setInterval(()=>{
   const left=Math.max(0,Number(settings.openUntil||0)-Date.now());
-  $("entryCountdown").value=settings.live&&left>0?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`:"—";
-  $("statTime").textContent=settings.live&&left>0?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`:"—";
+  $("entryCountdown").value=settings.live&&left>0
+    ?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`
+    :(settings.startedAt?"ENTRY CLOSED":"—");
+  $("statTime").textContent=settings.live&&left>0
+    ?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`
+    :(settings.startedAt?"CLOSED":"—");
   if(settings.live&&left<=0&&db){
     dataUpdate("settings/current",{live:false}).catch(()=>{});
   }
@@ -841,7 +1016,7 @@ $("publishQuestionsBtn").onclick=async()=>{
    ADMIN QUIZ CONTROL
 ========================= */
 $("startAdminQuizBtn").onclick=async()=>{
-  if(!confirm("Quiz सुरू केल्यावर 20 मिनिटांची Entry Window सुरू होईल. START करायचे?"))return;
+  if(!confirm("Quiz सुरू केल्यावर 1 तासाची Entry Window सुरू होईल. START करायचे?"))return;
   forceOnline();
   try{
     const date=$("adminDate").value||istDate();
@@ -901,8 +1076,11 @@ $("resumeBtn").onclick=async()=>{
 async function beginParticipant(resumeOnly){
   if(!db)return toast("Database initialize झालेली नाही.");
   forceOnline();
-  const name=$("pName").value.trim(), mobile=safeMobile($("pMobile").value), cls=$("pClass").value;
-  if(name.length<2)return toast("पूर्ण नाव भरा.");
+
+  const name=$("pName").value.trim();
+  const mobile=safeMobile($("pMobile").value);
+  const cls=$("pClass").value;
+
   if(!/^[6-9]\d{9}$/.test(mobile))return toast("योग्य 10 अंकी मोबाईल नंबर भरा.");
 
   const date=settings.quizDate||istDate();
@@ -912,17 +1090,19 @@ async function beginParticipant(resumeOnly){
   if(old){
     if(old.status==="submitted")return toast("या नंबरवरून Quiz आधीच submit झाला आहे.");
     if(old.status==="started"){
+      localStorage.setItem("ganpati_active",JSON.stringify({date,mobile}));
       return resumeAttempt(old,date,mobile);
     }
   }
 
-  if(resumeOnly)return toast("या मोबाईल नंबरसाठी started attempt सापडला नाही.");
-  if(!settings.live||Date.now()>=Number(settings.openUntil||0))return toast("नवीन Entry बंद आहे.");
+  if(resumeOnly)return toast("या मोबाईल नंबरसाठी सुरू केलेला Quiz सापडला नाही.");
+  if(!settings.live||Date.now()>=Number(settings.openUntil||0))return toast("आजची नवीन Entry बंद आहे.");
+  if(name.length<2)return toast("पूर्ण नाव भरा.");
+  if(!participantPhotoPng)return toast("चेहरा स्पष्ट दिसणारा फोटो निवडा.");
 
   const sets=await dataGet(`days/${date}/public/sets`);
   if(!sets)return toast("Questions उपलब्ध नाहीत.");
-  const setNames=Object.keys(sets);
-  const setName=setNames[Math.floor(Math.random()*setNames.length)];
+  const setName=await chooseBalancedSet(date,sets);
   const qs=normalizeList(sets[setName]);
   if(qs.length!==10)return toast("या Set मध्ये 10 प्रश्न उपलब्ध नाहीत.");
   const questionOrder=shuffle(qs.map((_,i)=>i));
@@ -930,7 +1110,7 @@ async function beginParticipant(resumeOnly){
   questionOrder.forEach(qi=>optionOrders[qi]=shuffle([0,1,2,3]));
 
   const attempt={
-    name,mobile,className:cls,setName,status:"started",startedAt:Date.now(),
+    name,mobile,className:cls,photoPng:participantPhotoPng,setName,status:"started",startedAt:Date.now(),
     currentIndex:0,questionStartedAt:Date.now(),questionOrder,optionOrders,answers:{}
   };
   await dataSet(attemptPath,attempt);
@@ -1037,6 +1217,7 @@ async function loadMyResult(){
   }
   const cls=r.disqualified?"notice bad":"notice ok";
   let out=`<div class="${cls}">
+    ${r.photoPng?`<img class="photo-preview show" style="width:90px;height:90px;margin-bottom:8px" src="${r.photoPng}" alt="photo"><br>`:""}
     <b>${esc(r.name)}</b> • ${esc(r.className||"")}<br>
     Score: <b>${r.score}/10</b> • Rank: <b>${r.disqualified?"DQ":"#"+r.rank}</b> • Time: <b>${fmtDuration(r.elapsedMs)}</b>
   </div>`;
@@ -1114,7 +1295,8 @@ async function loadLive(){
   const body=$("liveBody");body.innerHTML="";
   Object.values(raw).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0)).forEach(a=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
+    tr.innerHTML=`<td>${a.photoPng?`<img class="photo-mini" src="${a.photoPng}" alt="photo">`:"—"}</td>
+      <td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
       <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
       <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>`;
     body.appendChild(tr);
@@ -1132,6 +1314,8 @@ $("unpublishResultBtn").onclick=async()=>{
   toast("Result Unpublished");
 }
 $("exportCsvBtn").onclick=exportCsv;
+$("pdfReportBtn").onclick=generateColourPdfReport;
+$("shortPdfBtn").onclick=generateShortPrintPdf;
 
 async function computeResults(date){
   const [attemptsVal,setsVal,keysVal]=await Promise.all([
@@ -1183,7 +1367,9 @@ function renderResults(rows,date){
   const body=$("resultBody");body.innerHTML="";
   rows.forEach(r=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${r.disqualified?"DQ":"#"+r.rank}</td><td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.className||"")}</td><td>${esc(r.setName)}</td>
+    tr.innerHTML=`<td>${r.disqualified?"DQ":"#"+r.rank}</td>
+      <td>${r.photoPng?`<img class="photo-mini" src="${r.photoPng}" alt="photo">`:"—"}</td>
+      <td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.className||"")}</td><td>${esc(r.setName)}</td>
       <td><b>${r.score}/10</b></td><td>${fmtDuration(r.elapsedMs)}</td>
       <td>${r.disqualified?"❌ Disqualified":r.verified?"✅ Verified":"Pending"}</td>
       <td>
@@ -1212,7 +1398,7 @@ async function publishResults(){
   if(!rows.length)return toast("Submitted attempts नाहीत.");
   const obj={};
   rows.forEach(r=>obj[r.mobile]={
-    name:r.name,mobile:r.mobile,className:r.className||"",setName:r.setName,score:r.score,rank:r.rank,
+    name:r.name,mobile:r.mobile,className:r.className||"",photoPng:r.photoPng||"",setName:r.setName,score:r.score,rank:r.rank,
     elapsedMs:r.elapsedMs,submittedAt:r.submittedAt,review:r.review,disqualified:r.disqualified,verified:!!r.verified
   });
   await Promise.all([
@@ -1230,6 +1416,293 @@ function exportCsv(){
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Ganpati_Quiz_${$("resultAdminDate").value||istDate()}.csv`;a.click();URL.revokeObjectURL(a.href);
+}
+
+
+/* =========================
+   DATE-WISE COLOUR PDF REPORT
+========================= */
+function reportPhoto(src,size=48){
+  return src
+    ? `<img src="${src}" style="width:${size}px;height:${size}px;border-radius:10px;object-fit:cover;border:1px solid #ddd;background:#f6f2ea">`
+    : `<div style="width:${size}px;height:${size}px;border-radius:10px;background:#eee;display:flex;align-items:center;justify-content:center;color:#999;font-size:11px">No Photo</div>`;
+}
+function reportEsc(s){return esc(s)}
+function reportStatus(a,r){
+  if(a.disqualified || (r&&r.disqualified)) return "DQ";
+  if(a.status==="submitted") return r&&r.verified ? "Submitted • Verified" : "Submitted";
+  return "Incomplete";
+}
+function reportCard(label,value,accent){
+  return `<div style="border:1px solid #eadfce;border-radius:16px;padding:12px;background:#fff;box-shadow:0 4px 14px rgba(0,0,0,.05);border-top:5px solid ${accent}">
+    <div style="font-size:12px;color:#6c756f;font-weight:700">${reportEsc(label)}</div>
+    <div style="font-size:25px;font-weight:950;color:#17251b;margin-top:3px">${reportEsc(value)}</div>
+  </div>`;
+}
+function reportShell(content,pageNo,totalPages,date,title){
+  return `<section style="width:794px;min-height:1123px;background:#fff;position:relative;padding:32px 34px 52px;box-sizing:border-box;color:#17251b;font-family:system-ui,-apple-system,'Noto Sans Devanagari','Segoe UI',sans-serif;overflow:hidden">
+    <div style="height:9px;background:linear-gradient(90deg,#FF9933 0 33.33%,#fff 33.33% 66.66%,#138808 66.66%);border:1px solid #eee;border-radius:999px;margin-bottom:18px"></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #eee6da;padding-bottom:14px;margin-bottom:16px">
+      <div>
+        <div style="font-size:13px;font-weight:950;letter-spacing:.08em;color:#a85c12">JAY HIND GANESH MITRA MANDAL</div>
+        <div style="font-size:27px;font-weight:950;color:#000080;line-height:1.15;margin-top:4px">जय हिंद गणेश मित्र मंडळ</div>
+        <div style="font-size:16px;font-weight:850;color:#138808;margin-top:4px">Online प्रश्नमंजुषा • Date-wise Colour Report</div>
+      </div>
+      <div style="text-align:right;font-size:12px;line-height:1.55;color:#5e6861">
+        <b>दिनांक:</b> ${reportEsc(prettyDate(date))}<br>
+        <b>Quiz:</b> ${reportEsc(title||"गणेशोत्सव प्रश्नमंजुषा")}
+      </div>
+    </div>
+    ${content}
+    <div style="position:absolute;left:34px;right:34px;bottom:22px;border-top:1px solid #eee;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#7a817c">
+      <span>जय हिंद गणेश मित्र मंडळ • Online Quiz System</span><span>Page ${pageNo} / ${totalPages}</span>
+    </div>
+  </section>`;
+}
+async function waitForReportImages(root){
+  const imgs=[...root.querySelectorAll("img")];
+  await Promise.all(imgs.map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=res;img.onerror=res})));
+}
+async function generateColourPdfReport(){
+  const btn=$("pdfReportBtn");
+  const oldText=btn.textContent;
+  let host=null;
+  try{
+    if(!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF){
+      throw new Error("PDF library load झाली नाही. Internet चालू ठेवून page reload करा.");
+    }
+    btn.disabled=true;
+    btn.textContent="PDF तयार होत आहे...";
+    toast("Date-wise PDF report तयार होत आहे...");
+
+    const date=$("resultAdminDate").value||$("adminDate").value||istDate();
+    const [attemptsVal,metaVal,pubVal,computed]=await Promise.all([
+      dataGet(`attempts/${date}`),
+      dataGet(`days/${date}/meta`),
+      dataGet(`published/${date}`),
+      computeResults(date)
+    ]);
+    const meta=metaVal||{};
+    const attempts=Object.values(attemptsVal||{});
+    if(!attempts.length) throw new Error("या तारखेसाठी participant data नाही.");
+
+    const byMobile=Object.fromEntries(computed.map(r=>[String(r.mobile),r]));
+    const validRows=computed.filter(r=>!r.disqualified);
+    const top3=validRows.slice(0,3);
+    const submitted=attempts.filter(a=>a.status==="submitted").length;
+    const incomplete=attempts.length-submitted;
+    const dq=computed.filter(r=>r.disqualified).length;
+    const verified=computed.filter(r=>r.verified&&!r.disqualified).length;
+    const avg=validRows.length?(validRows.reduce((s,r)=>s+Number(r.score||0),0)/validRows.length).toFixed(2):"0.00";
+
+    const setNames=[...new Set(attempts.map(a=>a.setName).filter(Boolean))].sort();
+    const setStats=setNames.map(set=>{
+      const aa=attempts.filter(a=>a.setName===set);
+      const rr=aa.map(a=>byMobile[String(a.mobile)]).filter(Boolean).filter(r=>!r.disqualified);
+      const avgSet=rr.length?(rr.reduce((s,r)=>s+Number(r.score||0),0)/rr.length).toFixed(1):"-";
+      return {set,count:aa.length,submitted:aa.filter(a=>a.status==="submitted").length,avg:avgSet};
+    });
+
+    const scoreDist=Array.from({length:11},(_,score)=>({score,count:validRows.filter(r=>Number(r.score)===score).length}));
+    const maxDist=Math.max(1,...scoreDist.map(x=>x.count));
+
+    const summaryContent=`
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px">
+        ${reportCard("Total Attempts",attempts.length,"#000080")}
+        ${reportCard("Submitted",submitted,"#138808")}
+        ${reportCard("Incomplete",incomplete,"#FF9933")}
+        ${reportCard("Valid Avg Score",avg+" / 10","#b58512")}
+        ${reportCard("Disqualified",dq,"#c0392b")}
+        ${reportCard("Verified",verified,"#19a66f")}
+        ${reportCard("Sets",meta.setCount||setNames.length,"#6f42c1")}
+        ${reportCard("Questions",meta.questionCount||"-","#008c95")}
+      </div>
+
+      <div style="display:grid;grid-template-columns:1.1fr .9fr;gap:14px;margin-bottom:15px">
+        <div style="border:1px solid #eadfce;border-radius:18px;padding:14px;background:#fffaf2">
+          <div style="font-size:17px;font-weight:950;color:#000080;margin-bottom:10px">🏆 Top 3</div>
+          ${top3.length?top3.map((r,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:${i<top3.length-1?'1px dashed #dfd7ca':'none'}">
+            <div style="font-size:22px;width:34px">${["🥇","🥈","🥉"][i]}</div>${reportPhoto(r.photoPng,46)}
+            <div style="flex:1"><div style="font-weight:950">${reportEsc(r.name)}</div><div style="font-size:11px;color:#68736c">${reportEsc(r.className||"")} • Set ${reportEsc(r.setName||"")}</div></div>
+            <div style="text-align:right"><b style="font-size:18px;color:#138808">${r.score}/10</b><div style="font-size:10px;color:#68736c">${fmtDuration(r.elapsedMs)}</div></div>
+          </div>`).join(""):`<div style="color:#777">Submitted result नाही.</div>`}
+        </div>
+
+        <div style="border:1px solid #eadfce;border-radius:18px;padding:14px;background:#fbfffb">
+          <div style="font-size:17px;font-weight:950;color:#138808;margin-bottom:8px">Score Distribution</div>
+          ${scoreDist.map(x=>`<div style="display:flex;align-items:center;gap:7px;margin:4px 0;font-size:10px"><div style="width:28px;font-weight:900">${x.score}/10</div><div style="flex:1;height:9px;background:#eee;border-radius:99px;overflow:hidden"><div style="height:100%;width:${(x.count/maxDist)*100}%;background:linear-gradient(90deg,#FF9933,#138808)"></div></div><div style="width:18px;text-align:right">${x.count}</div></div>`).join("")}
+        </div>
+      </div>
+
+      <div style="border:1px solid #eadfce;border-radius:18px;padding:14px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><div style="font-size:17px;font-weight:950;color:#000080">Set-wise Performance</div><div style="font-size:11px;color:#68736c">Result: ${pubVal&&pubVal.published?"Published":"Not Published"}</div></div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#fff0d6"><th style="padding:7px;text-align:left">Set</th><th>Attempts</th><th>Submitted</th><th>Avg Score</th></tr></thead><tbody>
+        ${setStats.map(s=>`<tr><td style="padding:6px;border-bottom:1px solid #eee;font-weight:900">Set ${reportEsc(s.set)}</td><td style="text-align:center;border-bottom:1px solid #eee">${s.count}</td><td style="text-align:center;border-bottom:1px solid #eee">${s.submitted}</td><td style="text-align:center;border-bottom:1px solid #eee">${s.avg}</td></tr>`).join("")}
+        </tbody></table>
+      </div>
+
+      <div style="font-size:11px;color:#59645d;background:#f6f8f6;border-radius:12px;padding:10px 12px"><b>Report Status:</b> Questions ${meta.publishedQuestionsAt?"Published":"-"} • Result ${pubVal&&pubVal.published?"Published":"Pending"} • Generated ${new Date().toLocaleString("mr-IN")}</div>`;
+
+    const ordered=[...attempts].sort((a,b)=>{
+      const ra=byMobile[String(a.mobile)], rb=byMobile[String(b.mobile)];
+      if(ra&&rb) return (ra.disqualified-rb.disqualified)||((ra.rank||9999)-(rb.rank||9999));
+      if(ra) return -1;if(rb) return 1;
+      return Number(a.startedAt||0)-Number(b.startedAt||0);
+    });
+
+    const perPage=11;
+    const chunks=[];
+    for(let i=0;i<ordered.length;i+=perPage) chunks.push(ordered.slice(i,i+perPage));
+    const totalPages=1+chunks.length;
+    const title=meta.title||settings.title||"गणेशोत्सव प्रश्नमंजुषा";
+
+    host=document.createElement("div");
+    host.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1";
+    document.body.appendChild(host);
+    host.insertAdjacentHTML("beforeend",reportShell(summaryContent,1,totalPages,date,title));
+
+    chunks.forEach((chunk,idx)=>{
+      const startNo=idx*perPage+1;
+      const rows=chunk.map((a,j)=>{
+        const r=byMobile[String(a.mobile)]||null;
+        return `<tr style="height:61px">
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:850">${startNo+j}</td>
+          <td style="padding:5px;border-bottom:1px solid #ece7df">${reportPhoto(a.photoPng||(r&&r.photoPng)||"",42)}</td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df"><b>${reportEsc(a.name||"")}</b><div style="font-size:9px;color:#777">${reportEsc(a.mobile||"")}</div></td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${reportEsc(a.className||"")}</td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:850">${reportEsc(a.setName||"-")}</td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:950;color:#000080">${r?r.score+"/10":"-"}</td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${r?fmtDuration(r.elapsedMs):"-"}</td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${r&&!r.disqualified?"#"+r.rank:(r&&r.disqualified?"DQ":"-")}</td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;font-size:9px">${reportEsc(reportStatus(a,r))}<br><span style="color:#777">${fmtTime(a.startedAt)} → ${fmtTime(a.submittedAt)}</span></td>
+        </tr>`;
+      }).join("");
+      const content=`<div style="font-size:18px;font-weight:950;color:#000080;margin-bottom:10px">Participant Detailed Report <span style="font-size:11px;color:#69726d;font-weight:700">(${startNo}-${startNo+chunk.length-1} of ${ordered.length})</span></div>
+        <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #e8e1d6;border-radius:12px;overflow:hidden">
+          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:34px"><th>#</th><th>Photo</th><th style="text-align:left">Name / Mobile</th><th>Class</th><th>Set</th><th>Score</th><th>Time</th><th>Rank</th><th>Status</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+      host.insertAdjacentHTML("beforeend",reportShell(content,idx+2,totalPages,date,title));
+    });
+
+    if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+    await waitForReportImages(host);
+
+    const pages=[...host.children];
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+    for(let i=0;i<pages.length;i++){
+      if(i>0)pdf.addPage("a4","portrait");
+      const canvas=await html2canvas(pages[i],{scale:1.55,useCORS:true,backgroundColor:"#ffffff",logging:false});
+      const img=canvas.toDataURL("image/jpeg",0.88);
+      pdf.addImage(img,"JPEG",0,0,210,297,undefined,"FAST");
+    }
+    pdf.save(`JAY_HIND_Quiz_Report_${date}.pdf`);
+    toast("Colour PDF Report तयार झाला ✅");
+  }catch(err){
+    console.error("PDF REPORT ERROR",err);
+    toast(err.message||"PDF report तयार झाला नाही.");
+  }finally{
+    if(host)host.remove();
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
+}
+
+
+/* =========================
+   SHORT PRINT PDF • NOTICE BOARD
+========================= */
+async function generateShortPrintPdf(){
+  const btn=$("shortPdfBtn");
+  const oldText=btn.textContent;
+  let host=null;
+  try{
+    if(!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF){
+      throw new Error("PDF library load झाली नाही. Internet चालू ठेवून page reload करा.");
+    }
+
+    btn.disabled=true;
+    btn.textContent="Short PDF तयार होत आहे...";
+
+    const date=$("resultAdminDate").value||$("adminDate").value||istDate();
+    const rows=(await computeResults(date)).filter(r=>!r.disqualified);
+    if(!rows.length) throw new Error("या तारखेसाठी submitted result नाही.");
+
+    const perPage=30;
+    const chunks=[];
+    for(let i=0;i<rows.length;i+=perPage) chunks.push(rows.slice(i,i+perPage));
+
+    host=document.createElement("div");
+    host.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1";
+    document.body.appendChild(host);
+
+    chunks.forEach((chunk,pageIndex)=>{
+      const start=pageIndex*perPage;
+      const tableRows=chunk.map((r,i)=>`<tr style="height:31px">
+        <td style="border:1px solid #79867e;padding:7px;width:64px;text-align:center;font-weight:900">${r.rank||start+i+1}</td>
+        <td style="border:1px solid #79867e;padding:7px;font-weight:850">${reportEsc(r.name||"")}</td>
+        <td style="border:1px solid #79867e;padding:7px;width:110px;text-align:center;font-weight:950;color:#000080">${Number(r.score||0)}/10</td>
+        <td style="border:1px solid #79867e;padding:7px;width:120px;text-align:center;font-weight:850">${fmtDuration(r.elapsedMs)}</td>
+      </tr>`).join("");
+
+      const page=`<section style="width:794px;min-height:1123px;background:#fff;padding:34px 42px 46px;box-sizing:border-box;color:#17251b;font-family:system-ui,-apple-system,'Noto Sans Devanagari','Segoe UI',sans-serif;position:relative">
+        <div style="height:10px;background:linear-gradient(90deg,#FF9933 0 33.33%,#ffffff 33.33% 66.66%,#138808 66.66%);border:1px solid #e8e8e8;border-radius:999px;margin-bottom:18px"></div>
+
+        <div style="text-align:center;border-bottom:3px solid #000080;padding-bottom:14px;margin-bottom:14px">
+          <div style="font-size:30px;font-weight:950;color:#000080;line-height:1.18">जय हिंद गणेश मित्र मंडळ, परभणी</div>
+          <div style="font-size:20px;font-weight:900;color:#138808;margin-top:6px">गणेशोत्सव ऑनलाइन प्रश्नमंजुषा • निकाल</div>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:14px;font-size:16px;font-weight:850;background:#fff7e8;border:1px solid #f0d8b1;border-radius:12px;padding:10px 14px">
+          <div>दिनांक: <b>${reportEsc(prettyDate(date))}</b></div>
+          <div>एकूण स्पर्धक: <b>${rows.length}</b></div>
+        </div>
+
+        <table style="width:100%;border-collapse:collapse;border:2px solid #25362b;font-size:16px">
+          <thead>
+            <tr style="background:#f1f6ef;color:#17251b;height:40px">
+              <th style="border:1px solid #53645a;padding:8px">क्र.</th>
+              <th style="border:1px solid #53645a;padding:8px;text-align:left">नाव</th>
+              <th style="border:1px solid #53645a;padding:8px">गुण</th>
+              <th style="border:1px solid #53645a;padding:8px">वेळ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
+        </table>
+
+        <div style="position:absolute;left:42px;right:42px;bottom:22px;border-top:1px solid #ddd;padding-top:8px;display:flex;justify-content:space-between;font-size:11px;color:#68736c">
+          <span>जय हिंद गणेश मित्र मंडळ, परभणी</span>
+          <span>Page ${pageIndex+1} / ${chunks.length}</span>
+        </div>
+      </section>`;
+      host.insertAdjacentHTML("beforeend",page);
+    });
+
+    if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+    const pages=[...host.children];
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+
+    for(let i=0;i<pages.length;i++){
+      if(i>0)pdf.addPage("a4","portrait");
+      const canvas=await html2canvas(pages[i],{scale:1.7,useCORS:true,backgroundColor:"#ffffff",logging:false});
+      const img=canvas.toDataURL("image/jpeg",0.92);
+      pdf.addImage(img,"JPEG",0,0,210,297,undefined,"FAST");
+    }
+
+    pdf.save(`JAY_HIND_Short_Result_${date}.pdf`);
+    toast("Short Print PDF तयार झाला ✅");
+  }catch(err){
+    console.error("SHORT PDF ERROR",err);
+    toast(err.message||"Short PDF तयार झाला नाही.");
+  }finally{
+    if(host)host.remove();
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
 }
 
 /* =========================
@@ -1252,7 +1725,7 @@ async function loadArchive(){
    AUTO LOCAL RESUME HINT
 ========================= */
 try{
-  const saved=JSON.parse(localStorage.getItem("ganpati_active")||"null");
+  const saved=getSavedActiveAttempt();
   if(saved&&saved.mobile){$("pMobile").value=saved.mobile}
 }catch(e){}
 
