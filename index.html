@@ -1,4 +1,4 @@
-<!doctype html>
+ho<!doctype html>
 <html lang="mr">
 <head>
 <meta charset="utf-8">
@@ -728,7 +728,7 @@ function parseBulk(){
   const lines=$("bulkQuestions").value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   const sets={}; let current=null;
   for(const line of lines){
-    const sm=line.match(/^SET\s+([A-D])$/i);
+    const sm=line.match(/^SET\s+([A-Y])$/i);
     if(sm){current=sm[1].toUpperCase();sets[current]=[];continue}
     if(!current) continue;
     const p=line.split("|");
