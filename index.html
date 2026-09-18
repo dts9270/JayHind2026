@@ -8,7 +8,6 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -100,11 +99,6 @@ th{background:#fff2db;position:sticky;top:0}
 .codehint{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#f7f2ec;padding:10px;border-radius:12px;overflow:auto}
 .small{font-size:12px}
 
-.video-card{border:1px solid var(--line);border-radius:16px;padding:12px;background:#fffefb;margin:10px 0}
-.video-grid{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
-.video-meta{font-size:13px;line-height:1.45}
-.video-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
-@media(max-width:680px){.video-grid{grid-template-columns:1fr}.video-actions{justify-content:flex-start}}
 
 
 
@@ -152,8 +146,7 @@ th{background:#fff2db;position:sticky;top:0}
       2. प्रत्येक प्रश्नासाठी 30 सेकंद.<br>
       3. एकदा पुढे गेल्यावर मागे जाता येणार नाही.<br>
       4. एक मोबाईल नंबर = एकच प्रयत्न.<br>
-      5. नाव व मोबाईल आवश्यक.<br>
-      6. Quiz verification साठी संमतीनंतर front-camera video recording होईल.
+      5. नाव व मोबाईल आवश्यक.
     </div>
 
     <div id="entryForm" class="hidden">
@@ -166,31 +159,7 @@ th{background:#fff2db;position:sticky;top:0}
           <label>मोबाईल नंबर</label>
           <input id="pMobile" inputmode="numeric" maxlength="10" placeholder="10 अंकी नंबर">
         </div>
-        <div>
-          <label>इयत्ता</label>
-          <select id="pClass">
-            <option value="5वी">5वी</option>
-            <option value="6वी">6वी</option>
-            <option value="7वी">7वी</option>
-            <option value="8वी">8वी</option>
-            <option value="9वी">9वी</option>
-            <option value="10वी">10वी</option>
-            <option value="11वी">11वी</option>
-            <option value="12वी">12वी</option>
-            <option value="इतर">इतर</option>
-          </select>
-        </div>
-        <div>
-          <label>उरलेला Entry Time</label>
-          <input id="entryCountdown" value="—" readonly>
-        </div>
-      </div>
-      <div class="notice" id="videoConsentBox">
-        <label style="display:flex;gap:10px;align-items:flex-start;margin:0">
-          <input id="videoConsent" type="checkbox" style="width:auto;margin-top:4px">
-          <span><b>Video Recording Consent</b><br><span class="small">Quiz verification साठी front camera video record व save करण्यास पालक/स्पर्धक संमती आहे.</span></span>
-        </label>
-      </div>
+</div>
       <div class="actions">
         <button id="startBtn" class="btn green">▶ START QUIZ</button>
         <button id="resumeBtn" class="btn light">↩ Resume</button>
@@ -281,7 +250,6 @@ th{background:#fff2db;position:sticky;top:0}
       <button class="tab active" data-tab="dashboardTab">Dashboard</button>
       <button class="tab" data-tab="liveTab">Live Attempts</button>
       <button class="tab" data-tab="resultsTab">Results</button>
-      <button class="tab" data-tab="videosTab">Videos</button>
       <button class="tab" data-tab="archiveTab">Archive</button>
     </div>
 
@@ -358,7 +326,7 @@ th{background:#fff2db;position:sticky;top:0}
       </div>
       <div class="tablewrap" style="margin-top:12px">
         <table>
-          <thead><tr><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
+          <thead><tr><th>नाव</th><th>मोबाईल</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
           <tbody id="liveBody"></tbody>
         </table>
       </div>
@@ -390,26 +358,11 @@ th{background:#fff2db;position:sticky;top:0}
       <div class="tablewrap" style="margin-top:14px">
         <table>
           <thead>
-            <tr><th>Rank</th><th>नाव</th><th>मोबाईल</th><th>Class</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
+            <tr><th>Rank</th><th>नाव</th><th>मोबाईल</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
       </div>
-    </div>
-
-    <!-- VIDEOS -->
-    <div id="videosTab" class="admin-panel hidden">
-      <div class="grid">
-        <div>
-          <label>Video Date</label>
-          <input id="videoAdminDate" type="date">
-        </div>
-        <div style="display:flex;align-items:end">
-          <button id="refreshVideosBtn" class="btn green" style="width:100%">↻ Date-wise Videos</button>
-        </div>
-      </div>
-      <div id="videoSummary" class="notice">तारीख निवडा.</div>
-      <div id="videosList"></div>
     </div>
 
     <!-- ARCHIVE -->
@@ -453,8 +406,6 @@ let parsedSets={};
 let activeAttempt=null, activeQuestions=[], qIndex=0, qTimer=null;
 let resultsCache=[];
 let adminQuestionsReady=false;
-let videoRecorder=null, videoStream=null, videoChunks=[], videoStartedAt=0;
-let videoBlob=null;
 
 /* =========================
    HELPERS
@@ -603,63 +554,6 @@ function normalizeList(v){
 }
 function answerIndex(letter){return ["A","B","C","D"].indexOf(String(letter).trim().toUpperCase())}
 
-
-async function startQuizVideoRecording(){
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    throw new Error("या browser मध्ये camera recording support नाही.");
-  }
-  videoStream=await navigator.mediaDevices.getUserMedia({
-    video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},
-    audio:false
-  });
-  videoChunks=[];
-  videoBlob=null;
-  const preferred = MediaRecorder.isTypeSupported("video/webm;codecs=vp8")
-    ? "video/webm;codecs=vp8"
-    : (MediaRecorder.isTypeSupported("video/webm") ? "video/webm" : "");
-  videoRecorder = preferred ? new MediaRecorder(videoStream,{mimeType:preferred}) : new MediaRecorder(videoStream);
-  videoRecorder.ondataavailable=e=>{ if(e.data&&e.data.size>0) videoChunks.push(e.data); };
-  videoRecorder.onstop=()=>{
-    videoBlob=new Blob(videoChunks,{type:videoRecorder.mimeType||"video/webm"});
-    if(videoStream){ videoStream.getTracks().forEach(t=>t.stop()); }
-    videoStream=null;
-  };
-  videoStartedAt=Date.now();
-  videoRecorder.start(1000);
-}
-function stopQuizVideoRecording(){
-  return new Promise(resolve=>{
-    if(!videoRecorder || videoRecorder.state==="inactive"){
-      if(videoStream){videoStream.getTracks().forEach(t=>t.stop());videoStream=null}
-      return resolve(videoBlob);
-    }
-    const r=videoRecorder;
-    const done=()=>setTimeout(()=>resolve(videoBlob),60);
-    r.addEventListener("stop",done,{once:true});
-    try{r.stop()}catch(e){resolve(videoBlob)}
-  });
-}
-async function uploadQuizVideo(date,mobile,name,setName){
-  const blob=await stopQuizVideoRecording();
-  if(!blob || !blob.size) return null;
-  if(!firebase.storage) throw new Error("Firebase Storage SDK उपलब्ध नाही.");
-  const ext="webm";
-  const safeName=String(name||"candidate").replace(/[^\p{L}\p{N}_-]+/gu,"_").slice(0,40)||"candidate";
-  const path=`ganpati_quiz_videos/${date}/${mobile}_${Date.now()}_${safeName}.${ext}`;
-  const ref=firebase.storage().ref().child(path);
-  const snap=await withTimeout(ref.put(blob,{
-    contentType:blob.type||"video/webm",
-    customMetadata:{quizDate:date,mobile,name:String(name||""),setName:String(setName||"")}
-  }),60000,"Video upload");
-  const url=await snap.ref.getDownloadURL();
-  const videoMeta={
-    name:String(name||""),mobile:String(mobile||""),setName:String(setName||""),
-    storagePath:path,url,bytes:blob.size,
-    recordedAt:videoStartedAt||Date.now(),uploadedAt:Date.now()
-  };
-  await dataSet(`videos/${date}/${mobile}`,videoMeta);
-  return videoMeta;
-}
 
 async function chooseBalancedSet(date,sets){
   const setNames=Object.keys(sets||{}).sort();
@@ -811,7 +705,6 @@ setInterval(()=>{ if(!connected) syncSettingsFallback(); },3000);
 
 $("adminDate").value=istDate();
 $("resultAdminDate").value=istDate();
-$("videoAdminDate").value=istDate();
 $("adminDate").addEventListener("change",()=>{loadAdminDashboard();updateFlowStatus();});
 $("rDate").value=yesterdayIST();
 
@@ -865,9 +758,6 @@ function updatePublicStatus(){
 }
 setInterval(()=>{
   const left=Math.max(0,Number(settings.openUntil||0)-Date.now());
-  $("entryCountdown").value=settings.live&&left>0
-    ?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`
-    :(settings.startedAt?"ENTRY CLOSED":"—");
   $("statTime").textContent=settings.live&&left>0
     ?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`
     :(settings.startedAt?"CLOSED":"—");
@@ -1065,7 +955,6 @@ async function beginParticipant(resumeOnly){
 
   const name=$("pName").value.trim();
   const mobile=safeMobile($("pMobile").value);
-  const cls=$("pClass").value;
 
   if(!/^[6-9]\d{9}$/.test(mobile))return toast("योग्य 10 अंकी मोबाईल नंबर भरा.");
 
@@ -1084,12 +973,8 @@ async function beginParticipant(resumeOnly){
   if(resumeOnly)return toast("या मोबाईल नंबरसाठी सुरू केलेला Quiz सापडला नाही.");
   if(!settings.live||Date.now()>=Number(settings.openUntil||0))return toast("आजची नवीन Entry बंद आहे.");
   if(name.length<2)return toast("पूर्ण नाव भरा.");
-  if(!$("videoConsent").checked)return toast("Video recording consent आवश्यक आहे.");
-
-  await startQuizVideoRecording();
   const sets=await dataGet(`days/${date}/public/sets`);
   if(!sets){
-    await stopQuizVideoRecording();
     return toast("Questions उपलब्ध नाहीत.");
   }
   const setName=await chooseBalancedSet(date,sets);
@@ -1100,7 +985,7 @@ async function beginParticipant(resumeOnly){
   questionOrder.forEach(qi=>optionOrders[qi]=shuffle([0,1,2,3]));
 
   const attempt={
-    name,mobile,className:cls,setName,status:"started",startedAt:Date.now(),
+    name,mobile,setName,status:"started",startedAt:Date.now(),
     currentIndex:0,questionStartedAt:Date.now(),questionOrder,optionOrders,answers:{}
   };
   await dataSet(attemptPath,attempt);
@@ -1119,7 +1004,7 @@ async function resumeAttempt(attempt,date,mobile){
   if(activeAttempt.questionOrder.length!==10) activeAttempt.questionOrder=[0,1,2,3,4,5,6,7,8,9];
   qIndex=Number(attempt.currentIndex||0);
   showOnly("quizView");
-  $("participantName").textContent=`${attempt.name} • ${attempt.className||""}`;
+  $("participantName").textContent=attempt.name;
   renderActiveQuestion();
 }
 
@@ -1177,18 +1062,6 @@ async function submitAttempt(){
     status:"submitted",submittedAt,elapsedMs,currentIndex:10
   });
 
-  try{
-    const v=await uploadQuizVideo(activeAttempt.date,activeAttempt.mobile,activeAttempt.name,activeAttempt.setName);
-    if(v){
-      await dataUpdate(`attempts/${activeAttempt.date}/${activeAttempt.mobile}`,{
-        videoUrl:v.url,videoPath:v.storagePath,videoBytes:v.bytes
-      });
-    }
-  }catch(videoErr){
-    console.error("VIDEO UPLOAD ERROR",videoErr);
-    toast("Quiz submit झाला; video upload मात्र failed.");
-  }
-
   localStorage.removeItem("ganpati_active");
   showOnly("doneView");
   $("doneMeta").innerHTML=`दिनांक: <b>${prettyDate(activeAttempt.date)}</b><br>नाव: <b>${esc(activeAttempt.name)}</b><br>Quiz Time: <b>${fmtDuration(elapsedMs)}</b>`;
@@ -1220,7 +1093,7 @@ async function loadMyResult(){
   }
   const cls=r.disqualified?"notice bad":"notice ok";
   let out=`<div class="${cls}">
-    <b>${esc(r.name)}</b> • ${esc(r.className||"")}<br>
+    <b>${esc(r.name)}</b><br>
     Score: <b>${r.score}/10</b> • Rank: <b>${r.disqualified?"DQ":"#"+r.rank}</b> • Time: <b>${fmtDuration(r.elapsedMs)}</b>
   </div>`;
   (r.review||[]).forEach((x,i)=>{
@@ -1257,7 +1130,6 @@ document.querySelectorAll(".tab").forEach(btn=>btn.onclick=()=>{
   $(btn.dataset.tab).classList.remove("hidden");
   if(btn.dataset.tab==="liveTab")loadLive();
   if(btn.dataset.tab==="resultsTab")previewResults();
-  if(btn.dataset.tab==="videosTab")loadVideos();
   if(btn.dataset.tab==="archiveTab")loadArchive();
 });
 
@@ -1298,7 +1170,7 @@ async function loadLive(){
   const body=$("liveBody");body.innerHTML="";
   Object.values(raw).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0)).forEach(a=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
+    tr.innerHTML=`<td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.setName||"")}</td>
       <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
       <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>`;
     body.appendChild(tr);
@@ -1370,7 +1242,7 @@ function renderResults(rows,date){
   rows.forEach(r=>{
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${r.disqualified?"DQ":"#"+r.rank}</td>
-      <td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.className||"")}</td><td>${esc(r.setName)}</td>
+      <td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.setName)}</td>
       <td><b>${r.score}/10</b></td><td>${fmtDuration(r.elapsedMs)}</td>
       <td>${r.disqualified?"❌ Disqualified":r.verified?"✅ Verified":"Pending"}</td>
       <td>
@@ -1399,7 +1271,7 @@ async function publishResults(){
   if(!rows.length)return toast("Submitted attempts नाहीत.");
   const obj={};
   rows.forEach(r=>obj[r.mobile]={
-    name:r.name,mobile:r.mobile,className:r.className||"",setName:r.setName,score:r.score,rank:r.rank,
+    name:r.name,mobile:r.mobile,setName:r.setName,score:r.score,rank:r.rank,
     elapsedMs:r.elapsedMs,submittedAt:r.submittedAt,review:r.review,disqualified:r.disqualified,verified:!!r.verified
   });
   await Promise.all([
@@ -1412,8 +1284,8 @@ async function publishResults(){
 
 function exportCsv(){
   if(!resultsCache.length)return toast("Preview Result आधी करा.");
-  const rows=[["Rank","Name","Mobile","Class","Set","Score","Time","Status"]];
-  resultsCache.forEach(r=>rows.push([r.disqualified?"DQ":r.rank,r.name,r.mobile,r.className,r.setName,r.score,fmtDuration(r.elapsedMs),r.disqualified?"DQ":r.verified?"Verified":"Pending"]));
+  const rows=[["Rank","Name","Mobile","Set","Score","Time","Status"]];
+  resultsCache.forEach(r=>rows.push([r.disqualified?"DQ":r.rank,r.name,r.mobile,r.setName,r.score,fmtDuration(r.elapsedMs),r.disqualified?"DQ":r.verified?"Verified":"Pending"]));
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Ganpati_Quiz_${$("resultAdminDate").value||istDate()}.csv`;a.click();URL.revokeObjectURL(a.href);
@@ -1519,7 +1391,7 @@ async function generateColourPdfReport(){
           <div style="font-size:17px;font-weight:950;color:#000080;margin-bottom:10px">🏆 Top 3</div>
           ${top3.length?top3.map((r,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:${i<top3.length-1?'1px dashed #dfd7ca':'none'}">
             <div style="font-size:22px;width:34px">${["🥇","🥈","🥉"][i]}</div>
-            <div style="flex:1"><div style="font-weight:950">${reportEsc(r.name)}</div><div style="font-size:11px;color:#68736c">${reportEsc(r.className||"")} • Set ${reportEsc(r.setName||"")}</div></div>
+            <div style="flex:1"><div style="font-weight:950">${reportEsc(r.name)}</div><div style="font-size:11px;color:#68736c">Set ${reportEsc(r.setName||"")}</div></div>
             <div style="text-align:right"><b style="font-size:18px;color:#138808">${r.score}/10</b><div style="font-size:10px;color:#68736c">${fmtDuration(r.elapsedMs)}</div></div>
           </div>`).join(""):`<div style="color:#777">Submitted result नाही.</div>`}
         </div>
@@ -1564,7 +1436,6 @@ async function generateColourPdfReport(){
         return `<tr style="height:61px">
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:850">${startNo+j}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df"><b>${reportEsc(a.name||"")}</b><div style="font-size:9px;color:#777">${reportEsc(a.mobile||"")}</div></td>
-          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${reportEsc(a.className||"")}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:850">${reportEsc(a.setName||"-")}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:950;color:#000080">${r?r.score+"/10":"-"}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${r?fmtDuration(r.elapsedMs):"-"}</td>
@@ -1574,7 +1445,7 @@ async function generateColourPdfReport(){
       }).join("");
       const content=`<div style="font-size:18px;font-weight:950;color:#000080;margin-bottom:10px">Participant Detailed Report <span style="font-size:11px;color:#69726d;font-weight:700">(${startNo}-${startNo+chunk.length-1} of ${ordered.length})</span></div>
         <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #e8e1d6;border-radius:12px;overflow:hidden">
-          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:34px"><th>#</th><th style="text-align:left">Name / Mobile</th><th>Class</th><th>Set</th><th>Score</th><th>Time</th><th>Rank</th><th>Status</th></tr></thead>
+          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:34px"><th>#</th><th style="text-align:left">Name / Mobile</th><th>Set</th><th>Score</th><th>Time</th><th>Rank</th><th>Status</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       host.insertAdjacentHTML("beforeend",reportShell(content,idx+2,totalPages,date,title));
@@ -1733,50 +1604,6 @@ async function generateShortPrintPdf(){
 
 
 /* =========================
-   DATE-WISE VIDEOS
-========================= */
-$("refreshVideosBtn").onclick=loadVideos;
-$("videoAdminDate").addEventListener("change",loadVideos);
-
-async function loadVideos(){
-  const date=$("videoAdminDate").value||istDate();
-  const [videosVal,attemptsVal]=await Promise.all([
-    dataGet(`videos/${date}`),
-    dataGet(`attempts/${date}`)
-  ]);
-  const videos=videosVal||{};
-  const attempts=attemptsVal||{};
-  const list=$("videosList");
-  const arr=Object.values(videos).sort((a,b)=>(Number(a.uploadedAt||0)-Number(b.uploadedAt||0)));
-
-  $("videoSummary").className="notice";
-  $("videoSummary").innerHTML=`<b>${prettyDate(date)}</b> • Videos: <b>${arr.length}</b>`;
-
-  if(!arr.length){
-    list.innerHTML='<div class="notice">या तारखेसाठी video उपलब्ध नाहीत.</div>';
-    return;
-  }
-
-  list.innerHTML=arr.map(v=>{
-    const a=attempts[v.mobile]||{};
-    const score=(a.score!==undefined?a.score:"—");
-    return `<div class="video-card">
-      <div class="video-grid">
-        <div class="video-meta">
-          <b style="font-size:16px">${esc(v.name||a.name||"")}</b><br>
-          📱 ${esc(v.mobile||"")} • Set ${esc(v.setName||a.setName||"—")}<br>
-          Start: ${fmtTime(a.startedAt)} • Submit: ${fmtTime(a.submittedAt)} • Time: ${fmtDuration(a.elapsedMs)}
-        </div>
-        <div class="video-actions">
-          <a class="btn green" href="${esc(v.url||"#")}" target="_blank" rel="noopener">▶ Play</a>
-          <a class="btn gold" href="${esc(v.url||"#")}" download>⬇ Download</a>
-        </div>
-      </div>
-    </div>`;
-  }).join("");
-}
-
-/* =========================
    ARCHIVE
 ========================= */
 $("refreshArchiveBtn").onclick=loadArchive;
@@ -1801,9 +1628,6 @@ try{
 }catch(e){}
 
 window.addEventListener("beforeunload",e=>{
-  if(videoRecorder && videoRecorder.state!=="inactive"){
-    try{videoRecorder.stop()}catch(_){}
-  }
   if(!$("quizView").classList.contains("hidden")){e.preventDefault();e.returnValue=""}
 });
 
