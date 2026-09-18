@@ -92,6 +92,16 @@ th{background:#fff2db;position:sticky;top:0}
 .rankbig{font-size:30px;font-weight:950;color:#845a00}
 .resultq{border:1px solid var(--line);border-radius:15px;padding:12px;margin:9px 0;background:#fffefb}
 .resultq.good{border-left:5px solid var(--green)}.resultq.bad{border-left:5px solid var(--red)}
+
+.answer-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:120;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto}
+.answer-modal.hidden{display:none}
+.answer-sheet{width:min(760px,100%);background:#fffdf8;border-radius:22px;padding:18px;box-shadow:0 20px 70px rgba(0,0,0,.35);margin:auto}
+.answer-sheet-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
+.answer-review-item{border:1px solid #e8e1d7;border-radius:14px;padding:11px;margin:9px 0;background:#fff}
+.answer-review-item.good{border-left:5px solid var(--green)}
+.answer-review-item.bad{border-left:5px solid var(--red)}
+.answer-review-q{font-weight:900;color:var(--navy);margin-bottom:7px;line-height:1.4}
+.answer-review-line{font-size:13px;line-height:1.5;margin:3px 0}
 .top-admin{position:fixed;right:12px;bottom:12px;z-index:50}
 .top-admin button{opacity:.8}
 .toast{position:fixed;left:50%;bottom:25px;transform:translateX(-50%);z-index:100;background:#1d241f;color:#fff;padding:11px 14px;border-radius:13px;display:none;max-width:92vw}
@@ -377,6 +387,19 @@ th{background:#fff2db;position:sticky;top:0}
 
 <div class="top-admin"><button id="adminBtn" class="btn light">⚙ Admin</button></div>
 <div id="toast" class="toast"></div>
+<div id="answerModal" class="answer-modal hidden">
+  <div class="answer-sheet">
+    <div class="answer-sheet-head">
+      <div>
+        <div class="kicker">USER-WISE ANSWER REPORT</div>
+        <h2 id="answerModalTitle" style="margin:4px 0 2px">उत्तर तपशील</h2>
+        <div id="answerModalMeta" class="muted"></div>
+      </div>
+      <button class="btn red" onclick="closeUserAnswers()">✕ Close</button>
+    </div>
+    <div id="answerModalBody"></div>
+  </div>
+</div>
 
 <script>
 (() => {
@@ -1246,12 +1269,44 @@ function renderResults(rows,date){
       <td><b>${r.score}/10</b></td><td>${fmtDuration(r.elapsedMs)}</td>
       <td>${r.disqualified?"❌ Disqualified":r.verified?"✅ Verified":"Pending"}</td>
       <td>
+        <button class="btn saffron small" onclick="openUserAnswers('${date}','${r.mobile}')">Answers</button>
         <button class="btn light small" onclick="verifyUser('${date}','${r.mobile}',true)">Verify</button>
         <button class="btn red small" onclick="toggleDQ('${date}','${r.mobile}',${!r.disqualified})">${r.disqualified?"Restore":"DQ"}</button>
       </td>`;
     body.appendChild(tr);
   });
 }
+
+
+window.closeUserAnswers=()=>{
+  $("answerModal").classList.add("hidden");
+};
+
+window.openUserAnswers=async(date,mobile)=>{
+  let row=resultsCache.find(r=>String(r.mobile)===String(mobile));
+  if(!row){
+    const rows=await computeResults(date);
+    row=rows.find(r=>String(r.mobile)===String(mobile));
+  }
+  if(!row){
+    toast("User answer data सापडला नाही.");
+    return;
+  }
+  $("answerModalTitle").textContent=row.name||"Participant";
+  $("answerModalMeta").textContent=`${row.mobile||""} • Set ${row.setName||"-"} • Score ${row.score||0}/${(row.review||[]).length||10}`;
+  const review=row.review||[];
+  $("answerModalBody").innerHTML=review.length?review.map((x,i)=>`
+    <div class="answer-review-item ${x.correct?"good":"bad"}">
+      <div class="answer-review-q">${i+1}. ${esc(x.question||"")}</div>
+      <div class="answer-review-line"><b>User Answer:</b> ${esc(x.selectedText||"उत्तर दिले नाही")}</div>
+      <div class="answer-review-line"><b>Correct Answer:</b> ${esc(x.correctText||"-")}</div>
+      <div class="answer-review-line"><b>Result:</b> ${x.correct?"✅ Correct":"❌ Wrong"}</div>
+      ${x.explanation?`<div class="answer-review-line muted"><b>Explanation:</b> ${esc(x.explanation)}</div>`:""}
+    </div>
+  `).join(""):'<div class="notice">Answer review उपलब्ध नाही.</div>';
+  $("answerModal").classList.remove("hidden");
+};
+$("answerModal").addEventListener("click",e=>{if(e.target===$("answerModal"))closeUserAnswers()});
 
 window.verifyUser=async(date,mobile,val)=>{
   await dataSet(`attempts/${date}/${mobile}/verified`,!!val);
@@ -1284,8 +1339,18 @@ async function publishResults(){
 
 function exportCsv(){
   if(!resultsCache.length)return toast("Preview Result आधी करा.");
-  const rows=[["Rank","Name","Mobile","Set","Score","Time","Status"]];
-  resultsCache.forEach(r=>rows.push([r.disqualified?"DQ":r.rank,r.name,r.mobile,r.setName,r.score,fmtDuration(r.elapsedMs),r.disqualified?"DQ":r.verified?"Verified":"Pending"]));
+  const maxQ=Math.max(0,...resultsCache.map(r=>(r.review||[]).length));
+  const header=["Rank","Name","Mobile","Set","Score","Time","Status"];
+  for(let i=0;i<maxQ;i++)header.push(`Q${i+1} User Answer`,`Q${i+1} Correct Answer`,`Q${i+1} Result`);
+  const rows=[header];
+  resultsCache.forEach(r=>{
+    const base=[r.disqualified?"DQ":r.rank,r.name,r.mobile,r.setName,r.score,fmtDuration(r.elapsedMs),r.disqualified?"DQ":r.verified?"Verified":"Pending"];
+    for(let i=0;i<maxQ;i++){
+      const x=(r.review||[])[i];
+      base.push(x?x.selectedText:"",x?x.correctText:"",x?(x.correct?"Correct":"Wrong"):"");
+    }
+    rows.push(base);
+  });
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Ganpati_Quiz_${$("resultAdminDate").value||istDate()}.csv`;a.click();URL.revokeObjectURL(a.href);
@@ -1421,7 +1486,8 @@ async function generateColourPdfReport(){
     const perPage=11;
     const chunks=[];
     for(let i=0;i<ordered.length;i+=perPage) chunks.push(ordered.slice(i,i+perPage));
-    const totalPages=1+chunks.length;
+    const answerRows=computed.filter(r=>(r.review||[]).length);
+    const totalPages=1+chunks.length+answerRows.length;
     const title=meta.title||settings.title||"गणेशोत्सव प्रश्नमंजुषा";
 
     host=document.createElement("div");
@@ -1449,6 +1515,34 @@ async function generateColourPdfReport(){
           <tbody>${rows}</tbody>
         </table>`;
       host.insertAdjacentHTML("beforeend",reportShell(content,idx+2,totalPages,date,title));
+    });
+
+    answerRows.forEach((r,idx)=>{
+      const review=r.review||[];
+      const answerTable=review.map((x,i)=>`
+        <tr>
+          <td style="width:28px;padding:6px;border-bottom:1px solid #eee;text-align:center;font-weight:900">${i+1}</td>
+          <td style="padding:6px;border-bottom:1px solid #eee;line-height:1.3">${reportEsc(x.question||"")}</td>
+          <td style="padding:6px;border-bottom:1px solid #eee;line-height:1.3;color:${x.correct?"#138808":"#b42318"};font-weight:800">${reportEsc(x.selectedText||"उत्तर दिले नाही")}</td>
+          <td style="padding:6px;border-bottom:1px solid #eee;line-height:1.3;font-weight:800">${reportEsc(x.correctText||"-")}</td>
+          <td style="width:55px;padding:6px;border-bottom:1px solid #eee;text-align:center;font-weight:950;color:${x.correct?"#138808":"#b42318"}">${x.correct?"✓":"✗"}</td>
+        </tr>`).join("");
+      const answerContent=`
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px">
+          <div>
+            <div style="font-size:18px;font-weight:950;color:#000080">User-wise Answer Report</div>
+            <div style="font-size:14px;font-weight:900;margin-top:4px">${reportEsc(r.name||"")}</div>
+            <div style="font-size:10px;color:#69726d">${reportEsc(r.mobile||"")} • Set ${reportEsc(r.setName||"-")}</div>
+          </div>
+          <div style="text-align:right"><div style="font-size:22px;font-weight:950;color:#138808">${r.score}/${review.length}</div><div style="font-size:10px;color:#69726d">${r.disqualified?"DQ":r.verified?"Verified":"Submitted"}</div></div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:9.5px;border:1px solid #e8e1d6">
+          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:32px">
+            <th>#</th><th style="text-align:left;padding:6px">Question</th><th style="text-align:left;padding:6px">User Answer</th><th style="text-align:left;padding:6px">Correct Answer</th><th>Result</th>
+          </tr></thead>
+          <tbody>${answerTable}</tbody>
+        </table>`;
+      host.insertAdjacentHTML("beforeend",reportShell(answerContent,2+chunks.length+idx,totalPages,date,title));
     });
 
     if(document.fonts&&document.fonts.ready) await document.fonts.ready;
