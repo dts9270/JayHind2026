@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 
 <style>
 :root{
@@ -385,6 +386,7 @@ th{background:#fff2db;position:sticky;top:0}
 
       <div class="actions">
         <button id="exportCsvBtn" class="btn gold">⬇ CSV Export</button>
+        <button id="excelAnswerBtn" class="btn green">📊 Excel Answer Report</button>
         <button id="pdfReportBtn" class="btn saffron">📄 JAY HIND Colour PDF Report</button>
         <button id="shortPdfBtn" class="btn green">🖨 Short Print PDF</button>
       </div>
@@ -1314,6 +1316,7 @@ $("unpublishResultBtn").onclick=async()=>{
   toast("Result Unpublished");
 }
 $("exportCsvBtn").onclick=exportCsv;
+$("excelAnswerBtn").onclick=exportExcelAnswerReport;
 $("pdfReportBtn").onclick=generateColourPdfReport;
 $("shortPdfBtn").onclick=generateShortPrintPdf;
 
@@ -1416,6 +1419,100 @@ function exportCsv(){
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Ganpati_Quiz_${$("resultAdminDate").value||istDate()}.csv`;a.click();URL.revokeObjectURL(a.href);
+}
+
+function orderedReviewRows(r){
+  const review=Array.isArray(r.review)?r.review:[];
+  const order=normalizeList(r.questionOrder);
+  if(order.length===review.length){
+    return order.map((origIdx,displayIdx)=>({
+      displayNo:displayIdx+1,
+      originalIndex:Number(origIdx),
+      item:review[Number(origIdx)]||{}
+    }));
+  }
+  return review.map((item,i)=>({displayNo:i+1,originalIndex:i,item}));
+}
+
+async function exportExcelAnswerReport(){
+  const btn=$("excelAnswerBtn");
+  const oldText=btn.textContent;
+  try{
+    if(!window.XLSX) throw new Error("Excel library load झाली नाही. Internet चालू ठेवून page reload करा.");
+    btn.disabled=true;
+    btn.textContent="Excel तयार होत आहे...";
+
+    const date=$("resultAdminDate").value||$("adminDate").value||istDate();
+    const rows=await computeResults(date);
+    if(!rows.length) throw new Error("या तारखेसाठी submitted result नाही.");
+
+    const summary=[
+      ["जय हिंद गणेश मित्र मंडळ, परभणी"],
+      ["गणेशोत्सव ऑनलाइन प्रश्नमंजुषा • Date-wise Result"],
+      ["दिनांक",prettyDate(date)],
+      ["एकूण गुण",10],
+      [],
+      ["Rank","Name","Mobile","Class","Set","Marks","Total Marks","Time","Status"]
+    ];
+    rows.forEach(r=>summary.push([
+      r.disqualified?"DQ":r.rank,
+      r.name||"",
+      r.mobile||"",
+      r.className||"",
+      r.setName||"",
+      Number(r.score||0),
+      10,
+      fmtDuration(r.elapsedMs),
+      r.disqualified?"Disqualified":(r.verified?"Verified":"Submitted")
+    ]));
+
+    const details=[
+      ["जय हिंद गणेश मित्र मंडळ, परभणी"],
+      ["Candidate Answer Details"],
+      ["दिनांक",prettyDate(date)],
+      [],
+      ["Rank","Name","Mobile","Class","Set","Score","Time","Question No","Question","User Answer","Correct Answer","Result","Explanation"]
+    ];
+
+    rows.forEach(r=>{
+      orderedReviewRows(r).forEach(x=>{
+        const q=x.item||{};
+        details.push([
+          r.disqualified?"DQ":r.rank,
+          r.name||"",
+          r.mobile||"",
+          r.className||"",
+          r.setName||"",
+          `${Number(r.score||0)}/10`,
+          fmtDuration(r.elapsedMs),
+          x.displayNo,
+          q.question||"",
+          q.selectedText||"उत्तर दिले नाही",
+          q.correctText||"",
+          q.correct?"बरोबर":"चुकीचे",
+          q.explanation||""
+        ]);
+      });
+    });
+
+    const wb=XLSX.utils.book_new();
+    const ws1=XLSX.utils.aoa_to_sheet(summary);
+    const ws2=XLSX.utils.aoa_to_sheet(details);
+    ws1["!cols"]=[{wch:8},{wch:28},{wch:14},{wch:12},{wch:8},{wch:10},{wch:12},{wch:10},{wch:14}];
+    ws2["!cols"]=[{wch:8},{wch:24},{wch:14},{wch:10},{wch:8},{wch:9},{wch:9},{wch:11},{wch:48},{wch:34},{wch:34},{wch:11},{wch:48}];
+    ws1["!freeze"]={xSplit:0,ySplit:6};
+    ws2["!freeze"]={xSplit:0,ySplit:5};
+    XLSX.utils.book_append_sheet(wb,ws1,"Summary");
+    XLSX.utils.book_append_sheet(wb,ws2,"Answer Details");
+    XLSX.writeFile(wb,`JAY_HIND_Answer_Report_${date}.xlsx`);
+    toast("Excel Answer Report तयार झाला ✅");
+  }catch(err){
+    console.error("EXCEL REPORT ERROR",err);
+    toast(err.message||"Excel report तयार झाला नाही.");
+  }finally{
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
 }
 
 
@@ -1553,7 +1650,17 @@ async function generateColourPdfReport(){
     const perPage=11;
     const chunks=[];
     for(let i=0;i<ordered.length;i+=perPage) chunks.push(ordered.slice(i,i+perPage));
-    const totalPages=1+chunks.length;
+
+    // प्रत्येक submitted candidate चे answers 5 प्रश्न प्रति PDF page.
+    const answerPages=[];
+    computed.forEach(r=>{
+      const orderedAnswers=orderedReviewRows(r);
+      for(let i=0;i<orderedAnswers.length;i+=5){
+        answerPages.push({candidate:r,items:orderedAnswers.slice(i,i+5),partStart:i+1});
+      }
+    });
+
+    const totalPages=1+chunks.length+answerPages.length;
     const title=meta.title||settings.title||"गणेशोत्सव प्रश्नमंजुषा";
 
     host=document.createElement("div");
@@ -1583,6 +1690,35 @@ async function generateColourPdfReport(){
           <tbody>${rows}</tbody>
         </table>`;
       host.insertAdjacentHTML("beforeend",reportShell(content,idx+2,totalPages,date,title));
+    });
+
+    answerPages.forEach((ap,idx)=>{
+      const r=ap.candidate;
+      const answerRows=ap.items.map(x=>{
+        const q=x.item||{};
+        const ok=!!q.correct;
+        return `<div style="border:1px solid ${ok?'#b8dfbf':'#efc3bd'};border-left:5px solid ${ok?'#138808':'#c0392b'};border-radius:12px;padding:9px 10px;margin-bottom:9px;background:${ok?'#f4fbf5':'#fff6f4'}">
+          <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+            <div style="font-size:12px;font-weight:950;color:#000080">Q${x.displayNo}. ${reportEsc(q.question||"")}</div>
+            <div style="font-size:17px;font-weight:950;white-space:nowrap">${ok?'✅':'❌'}</div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px;font-size:11px">
+            <div style="background:#fff;border-radius:8px;padding:7px;border:1px solid #e8e1d6"><b>User Answer:</b><br>${reportEsc(q.selectedText||"उत्तर दिले नाही")}</div>
+            <div style="background:#fff;border-radius:8px;padding:7px;border:1px solid #e8e1d6"><b>Correct Answer:</b><br>${reportEsc(q.correctText||"")}</div>
+          </div>
+          ${q.explanation?`<div style="font-size:10px;color:#5f6963;margin-top:6px"><b>स्पष्टीकरण:</b> ${reportEsc(q.explanation)}</div>`:""}
+        </div>`;
+      }).join("");
+
+      const candidateHeader=`<div style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:linear-gradient(90deg,#fff5e6,#f1fff0);border:1px solid #e4dccf;margin-bottom:12px">
+        ${reportPhoto(r.photoPng,56)}
+        <div style="flex:1"><div style="font-size:19px;font-weight:950;color:#000080">${reportEsc(r.name||"")}</div><div style="font-size:11px;color:#657069">${reportEsc(r.mobile||"")} • ${reportEsc(r.className||"")} • Set ${reportEsc(r.setName||"")}</div></div>
+        <div style="text-align:right"><div style="font-size:22px;font-weight:950;color:#138808">${Number(r.score||0)}/10</div><div style="font-size:11px">Time ${fmtDuration(r.elapsedMs)}</div><div style="font-size:11px">${r.disqualified?'DQ':'Rank #'+r.rank}</div></div>
+      </div>`;
+
+      const content=`<div style="font-size:18px;font-weight:950;color:#000080;margin-bottom:9px">Candidate Answer Report <span style="font-size:11px;color:#68736c">Questions ${ap.partStart}-${ap.partStart+ap.items.length-1}</span></div>${candidateHeader}${answerRows}`;
+      const pageNo=2+chunks.length+idx;
+      host.insertAdjacentHTML("beforeend",reportShell(content,pageNo,totalPages,date,title));
     });
 
     if(document.fonts&&document.fonts.ready) await document.fonts.ready;
