@@ -364,7 +364,7 @@ th{background:#fff2db;position:sticky;top:0}
       </div>
       <div class="tablewrap" style="margin-top:12px">
         <table>
-          <thead><tr><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
+          <thead><tr><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th><th>Action</th></tr></thead>
           <tbody id="liveBody"></tbody>
         </table>
       </div>
@@ -388,6 +388,7 @@ th{background:#fff2db;position:sticky;top:0}
         <button id="exportCsvBtn" class="btn gold">⬇ CSV Export</button>
         <button id="excelAnswerBtn" class="btn green">📊 Excel Answer Report</button>
         <button id="pdfReportBtn" class="btn saffron">📄 JAY HIND Colour PDF Report</button>
+        <button id="specialResultPdfBtn" class="btn gold">🏆 Special Result PDF</button>
         <button id="shortPdfBtn" class="btn green">🖨 Short Print PDF</button>
       </div>
 
@@ -1299,8 +1300,14 @@ async function loadLive(){
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${a.photoPng?`<img class="photo-mini" src="${a.photoPng}" alt="photo">`:"—"}</td>
       <td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
-      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
-      <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>`;
+      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}${a.excludeFromResult?" • 🙈 Result Hidden":""}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
+      <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>
+      <td>
+        <button class="btn ${a.excludeFromResult?"green":"red"} small"
+          onclick="hideUserFromResult('${date}','${a.mobile}',${!a.excludeFromResult})">
+          ${a.excludeFromResult?"↩ Result मध्ये Restore":"🙈 Result मधून Hide"}
+        </button>
+      </td>`;
     body.appendChild(tr);
   });
 }
@@ -1318,6 +1325,7 @@ $("unpublishResultBtn").onclick=async()=>{
 $("exportCsvBtn").onclick=exportCsv;
 $("excelAnswerBtn").onclick=exportExcelAnswerReport;
 $("pdfReportBtn").onclick=generateColourPdfReport;
+$("specialResultPdfBtn").onclick=generateSpecialResultPdf;
 $("shortPdfBtn").onclick=generateShortPrintPdf;
 
 async function computeResults(date){
@@ -1330,6 +1338,7 @@ async function computeResults(date){
   let rows=[];
   for(const a of Object.values(attempts)){
     if(!a||a.status!=="submitted")continue;
+    if(a.excludeFromResult)continue;
     const qs=normalizeList(sets[a.setName]);
     const key=normalizeList(keys[a.setName]);
     let score=0; const review=[];
@@ -1378,6 +1387,7 @@ function renderResults(rows,date){
       <td>
         <button class="btn light small" onclick="verifyUser('${date}','${r.mobile}',true)">Verify</button>
         <button class="btn red small" onclick="toggleDQ('${date}','${r.mobile}',${!r.disqualified})">${r.disqualified?"Restore":"DQ"}</button>
+        <button class="btn red small" onclick="hideUserFromResult('${date}','${r.mobile}',true)">🙈 Result मधून Hide</button>
       </td>`;
     body.appendChild(tr);
   });
@@ -1394,6 +1404,70 @@ window.toggleDQ=async(date,mobile,val)=>{
   toast(val?"Disqualified":"Restored");
   previewResults();
 }
+
+async function syncPublishedResultsAfterChange(date){
+  const pub=await dataGet(`published/${date}`);
+  if(!pub || !pub.published) return;
+
+  const rows=await computeResults(date);
+  const obj={};
+  rows.forEach(r=>{
+    obj[r.mobile]={
+      name:r.name,mobile:r.mobile,className:r.className||"",photoPng:r.photoPng||"",
+      setName:r.setName,score:r.score,rank:r.rank,elapsedMs:r.elapsedMs,
+      submittedAt:r.submittedAt,review:r.review,disqualified:r.disqualified,
+      verified:!!r.verified
+    };
+  });
+
+  await Promise.all([
+    dataSet(`results/${date}`,obj),
+    dataUpdate(`published/${date}`,{
+      published:true,
+      updatedAt:Date.now(),
+      count:rows.length
+    })
+  ]);
+}
+
+window.hideUserFromResult=async(date,mobile,hide)=>{
+  try{
+    const pin=prompt(hide
+      ?"Result मधून नाव Hide करण्यासाठी Admin PIN टाका:"
+      :"Result मध्ये Restore करण्यासाठी Admin PIN टाका:");
+    if(pin===null)return;
+    if(pin!==ADMIN_PIN)return toast("चुकीचा Admin PIN.");
+
+    const attempt=await dataGet(`attempts/${date}/${mobile}`);
+    if(!attempt)return toast("User सापडला नाही.");
+
+    const ok=confirm(hide
+      ?`${attempt.name||mobile} यांचा attempt delete होणार नाही.
+फक्त Result/Ranking/PDF/Excel मधून नाव Hide करायचे?`
+      :`${attempt.name||mobile} यांना पुन्हा Result मध्ये घ्यायचे?`);
+    if(!ok)return;
+
+    await dataUpdate(`attempts/${date}/${mobile}`,{
+      excludeFromResult:!!hide,
+      resultExcludedAt:hide?Date.now():null
+    });
+
+    await syncPublishedResultsAfterChange(date);
+
+    toast(hide
+      ?"Result मधून Hide केले ✅ • Attempt सुरक्षित आहे"
+      :"Result मध्ये Restore केले ✅");
+
+    if($("resultAdminDate"))$("resultAdminDate").value=date;
+    if($("adminDate"))$("adminDate").value=date;
+    await previewResults();
+    if(!$("liveTab").classList.contains("hidden")) await loadLive();
+    await loadAdminDashboard();
+  }catch(err){
+    console.error("RESULT HIDE ERROR",err);
+    toast("Update failed: Firebase तपासा.");
+  }
+};
 
 async function publishResults(){
   const date=$("resultAdminDate").value||yesterdayIST();
@@ -1738,6 +1812,139 @@ async function generateColourPdfReport(){
   }catch(err){
     console.error("PDF REPORT ERROR",err);
     toast(err.message||"PDF report तयार झाला नाही.");
+  }finally{
+    if(host)host.remove();
+    btn.disabled=false;
+    btn.textContent=oldText;
+  }
+}
+
+
+
+/* =========================
+   SPECIAL RESULT PDF • TOP 3
+========================= */
+async function generateSpecialResultPdf(){
+  const btn=$("specialResultPdfBtn");
+  const oldText=btn.textContent;
+  let host=null;
+  try{
+    if(!window.html2canvas || !window.jspdf || !window.jspdf.jsPDF){
+      throw new Error("PDF library load झाली नाही. Internet चालू ठेवून page reload करा.");
+    }
+
+    btn.disabled=true;
+    btn.textContent="Special PDF तयार होत आहे...";
+
+    const date=$("resultAdminDate").value||istDate();
+    const rows=(await computeResults(date)).filter(r=>!r.disqualified);
+    if(!rows.length)throw new Error("या तारखेसाठी submitted result नाही.");
+
+    const meta=(await dataGet(`days/${date}/meta`))||{};
+    const title=meta.title||"गणेशोत्सव ऑनलाइन प्रश्नमंजुषा";
+    const top=rows.slice(0,3);
+    const rest=rows.slice(3);
+
+    const medal=["🥇","🥈","🥉"];
+    const topCards=top.map((r,i)=>`
+      <div style="flex:1;min-width:0;border:2px solid ${i===0?"#d4af37":i===1?"#b5b7bd":"#b97a56"};border-radius:18px;padding:14px 10px;text-align:center;background:${i===0?"#fff9dd":i===1?"#f6f7fa":"#fff3eb"}">
+        <div style="font-size:34px">${medal[i]}</div>
+        ${r.photoPng
+          ? `<img src="${r.photoPng}" alt="photo" style="width:86px;height:86px;border-radius:50%;object-fit:cover;border:3px solid #fff;box-shadow:0 4px 14px #0002;margin:5px auto 8px;display:block">`
+          : `<div style="width:86px;height:86px;border-radius:50%;background:#eee;margin:5px auto 8px"></div>`
+        }
+        <div style="font-size:${i===0?24:21}px;font-weight:950;color:#000080;line-height:1.15;word-break:break-word">${reportEsc(r.name||"")}</div>
+        <div style="font-size:30px;font-weight:950;color:#138808;margin-top:6px">${Number(r.score||0)} / 10</div>
+        <div style="font-size:14px;font-weight:850;margin-top:4px">वेळ: ${fmtDuration(r.elapsedMs)}</div>
+        <div style="font-size:13px;color:#666;margin-top:2px">Rank #${r.rank}</div>
+      </div>
+    `).join("");
+
+    const perPage=22;
+    const restChunks=[];
+    for(let i=0;i<rest.length;i+=perPage) restChunks.push(rest.slice(i,i+perPage));
+
+    host=document.createElement("div");
+    host.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1";
+    document.body.appendChild(host);
+
+    const firstRest=restChunks.shift()||[];
+    const firstRows=firstRest.map(r=>`
+      <tr>
+        <td style="border-bottom:1px solid #e6e1d8;padding:7px;text-align:center;font-weight:900;width:55px">#${r.rank}</td>
+        <td style="border-bottom:1px solid #e6e1d8;padding:7px;font-weight:850">${reportEsc(r.name||"")}</td>
+        <td style="border-bottom:1px solid #e6e1d8;padding:7px;text-align:center;font-weight:950;color:#000080;width:80px">${Number(r.score||0)}</td>
+        <td style="border-bottom:1px solid #e6e1d8;padding:7px;text-align:center;width:95px">${fmtDuration(r.elapsedMs)}</td>
+      </tr>`).join("");
+
+    const firstPage=`<section style="width:794px;min-height:1123px;background:#fff;padding:26px 28px 44px;box-sizing:border-box;font-family:system-ui,-apple-system,'Noto Sans Devanagari','Segoe UI',sans-serif;color:#17251b;position:relative">
+      <div style="height:10px;background:linear-gradient(90deg,#FF9933 0 33.33%,#fff 33.33% 66.66%,#138808 66.66%);border:1px solid #eee;border-radius:99px;margin-bottom:14px"></div>
+      <div style="text-align:center;border-bottom:3px solid #000080;padding-bottom:12px">
+        <div style="font-size:31px;font-weight:950;color:#000080;line-height:1.15">जय हिंद गणेश मित्र मंडळ, परभणी</div>
+        <div style="font-size:20px;font-weight:900;color:#138808;margin-top:5px">${reportEsc(title)}</div>
+        <div style="font-size:14px;font-weight:800;margin-top:5px">दिनांक: ${reportEsc(prettyDate(date))} • एकूण स्पर्धक: ${rows.length} • एकूण गुण: 10</div>
+      </div>
+
+      <div style="font-size:23px;font-weight:950;text-align:center;color:#a56a00;margin:18px 0 12px">🏆 TOP 3 WINNERS 🏆</div>
+      <div style="display:flex;gap:10px;align-items:stretch">${topCards}</div>
+
+      ${firstRest.length?`
+      <div style="font-size:17px;font-weight:950;color:#000080;margin:20px 0 8px">इतर स्पर्धक</div>
+      <table style="width:100%;min-width:0!important;border-collapse:collapse;table-layout:fixed;font-size:13px;border:1px solid #ded8cf">
+        <thead><tr style="background:#f4f7f0"><th style="padding:7px;width:55px">Rank</th><th style="padding:7px;text-align:left">नाव</th><th style="padding:7px;width:80px">गुण</th><th style="padding:7px;width:95px">वेळ</th></tr></thead>
+        <tbody>${firstRows}</tbody>
+      </table>`:""}
+
+      <div style="position:absolute;left:28px;right:28px;bottom:18px;border-top:1px solid #ddd;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:#68736c">
+        <span>जय हिंद गणेश मित्र मंडळ, परभणी</span><span>Special Result</span>
+      </div>
+    </section>`;
+    host.insertAdjacentHTML("beforeend",firstPage);
+
+    restChunks.forEach((chunk,pageIndex)=>{
+      const rowsHtml=chunk.map(r=>`
+        <tr>
+          <td style="border-bottom:1px solid #e6e1d8;padding:9px;text-align:center;font-weight:900;width:60px">#${r.rank}</td>
+          <td style="border-bottom:1px solid #e6e1d8;padding:9px;font-weight:850">${reportEsc(r.name||"")}</td>
+          <td style="border-bottom:1px solid #e6e1d8;padding:9px;text-align:center;font-weight:950;color:#000080;width:85px">${Number(r.score||0)}</td>
+          <td style="border-bottom:1px solid #e6e1d8;padding:9px;text-align:center;width:100px">${fmtDuration(r.elapsedMs)}</td>
+        </tr>`).join("");
+
+      host.insertAdjacentHTML("beforeend",`<section style="width:794px;min-height:1123px;background:#fff;padding:30px 30px 44px;box-sizing:border-box;font-family:system-ui,-apple-system,'Noto Sans Devanagari','Segoe UI',sans-serif;color:#17251b;position:relative">
+        <div style="font-size:27px;font-weight:950;color:#000080;text-align:center">जय हिंद गणेश मित्र मंडळ, परभणी</div>
+        <div style="font-size:16px;font-weight:850;color:#138808;text-align:center;margin-top:4px">निकाल • ${reportEsc(prettyDate(date))}</div>
+        <div style="font-size:18px;font-weight:950;color:#000080;margin:18px 0 10px">इतर स्पर्धक</div>
+        <table style="width:100%;min-width:0!important;border-collapse:collapse;table-layout:fixed;font-size:14px;border:1px solid #ded8cf">
+          <thead><tr style="background:#f4f7f0"><th style="padding:8px;width:60px">Rank</th><th style="padding:8px;text-align:left">नाव</th><th style="padding:8px;width:85px">गुण</th><th style="padding:8px;width:100px">वेळ</th></tr></thead>
+          <tbody>${rowsHtml}</tbody>
+        </table>
+        <div style="position:absolute;left:30px;right:30px;bottom:18px;border-top:1px solid #ddd;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:#68736c">
+          <span>जय हिंद गणेश मित्र मंडळ, परभणी</span><span>Page ${pageIndex+2}</span>
+        </div>
+      </section>`);
+    });
+
+    if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+    await waitForReportImages(host);
+
+    const pages=[...host.children];
+    const {jsPDF}=window.jspdf;
+    const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
+
+    for(let i=0;i<pages.length;i++){
+      if(i>0)pdf.addPage("a4","portrait");
+      const canvas=await html2canvas(pages[i],{
+        scale:1.7,useCORS:true,allowTaint:true,backgroundColor:"#ffffff",logging:false
+      });
+      const img=canvas.toDataURL("image/jpeg",0.92);
+      pdf.addImage(img,"JPEG",0,0,210,297,undefined,"FAST");
+    }
+
+    pdf.save(`JAY_HIND_Special_Result_${date}.pdf`);
+    toast("Special Result PDF तयार झाला 🏆");
+  }catch(err){
+    console.error("SPECIAL PDF ERROR",err);
+    toast(err.message||"Special Result PDF तयार झाला नाही.");
   }finally{
     if(host)host.remove();
     btn.disabled=false;
