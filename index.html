@@ -1454,7 +1454,7 @@ function reportShell(content,pageNo,totalPages,date,title){
       </div>
     </div>
     ${content}
-    <div style="position:absolute;left:34px;right:34px;bottom:22px;border-top:1px solid #eee;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#7a817c">
+    <div style="position:absolute;left:24px;right:24px;bottom:22px;border-top:1px solid #eee;padding-top:8px;display:flex;justify-content:space-between;font-size:10px;color:#7a817c">
       <span>जय हिंद गणेश मित्र मंडळ • Online Quiz System</span><span>Page ${pageNo} / ${totalPages}</span>
     </div>
   </section>`;
@@ -1629,43 +1629,72 @@ async function generateShortPrintPdf(){
     const rows=(await computeResults(date)).filter(r=>!r.disqualified);
     if(!rows.length) throw new Error("या तारखेसाठी submitted result नाही.");
 
-    const perPage=30;
+    // Photo असलेला clean print report: 18 participants per A4 page.
+    const perPage=18;
     const chunks=[];
     for(let i=0;i<rows.length;i+=perPage) chunks.push(rows.slice(i,i+perPage));
+
+    const shortTime=ms=>{
+      const s=Math.max(0,Math.round((Number(ms)||0)/1000));
+      return `${pad(Math.floor(s/60))}:${pad(s%60)}`;
+    };
 
     host=document.createElement("div");
     host.style.cssText="position:fixed;left:-10000px;top:0;width:794px;background:#fff;z-index:-1";
     document.body.appendChild(host);
 
     chunks.forEach((chunk,pageIndex)=>{
-      const start=pageIndex*perPage;
-      const tableRows=chunk.map((r,i)=>`<tr style="height:31px">
-        <td style="border:1px solid #79867e;padding:7px;width:64px;text-align:center;font-weight:900">${r.rank||start+i+1}</td>
-        <td style="border:1px solid #79867e;padding:7px;font-weight:850">${reportEsc(r.name||"")}</td>
-        <td style="border:1px solid #79867e;padding:7px;width:110px;text-align:center;font-weight:950;color:#000080">${Number(r.score||0)}/10</td>
-        <td style="border:1px solid #79867e;padding:7px;width:120px;text-align:center;font-weight:850">${fmtDuration(r.elapsedMs)}</td>
-      </tr>`).join("");
+      const startNo=pageIndex*perPage;
 
-      const page=`<section style="width:794px;min-height:1123px;background:#fff;padding:34px 42px 46px;box-sizing:border-box;color:#17251b;font-family:system-ui,-apple-system,'Noto Sans Devanagari','Segoe UI',sans-serif;position:relative">
-        <div style="height:10px;background:linear-gradient(90deg,#FF9933 0 33.33%,#ffffff 33.33% 66.66%,#138808 66.66%);border:1px solid #e8e8e8;border-radius:999px;margin-bottom:18px"></div>
+      const tableRows=chunk.map((r,i)=>`
+        <tr style="height:56px">
+          <td style="border:1px solid #738178;padding:4px;text-align:center;overflow:hidden">
+            ${r.photoPng
+              ? `<img src="${r.photoPng}" alt="photo" style="width:40px;height:40px;object-fit:cover;border-radius:7px;border:1px solid #cfcfcf;display:block;margin:auto">`
+              : `<div style="width:40px;height:40px;border-radius:7px;background:#f1f1f1;border:1px solid #ddd;margin:auto;display:flex;align-items:center;justify-content:center;font-size:10px;color:#777">PHOTO</div>`
+            }
+          </td>
+          <td style="border:1px solid #738178;padding:6px;text-align:center;font-weight:900;overflow:hidden">${r.rank||startNo+i+1}</td>
+          <td style="border:1px solid #738178;padding:5px 6px;font-weight:850;line-height:1.15;word-break:break-word;font-size:13px;overflow:hidden">${reportEsc(r.name||"")}</td>
+          <td style="border:1px solid #738178;padding:6px;text-align:center;font-size:18px;font-weight:950;overflow:hidden;color:#000080">${Number(r.score||0)}</td>
+          <td style="border:1px solid #738178;padding:4px 2px;text-align:center;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:14px;font-weight:900;white-space:nowrap;overflow:hidden">${shortTime(r.elapsedMs)}</td>
+        </tr>`).join("");
 
-        <div style="text-align:center;border-bottom:3px solid #000080;padding-bottom:14px;margin-bottom:14px">
-          <div style="font-size:30px;font-weight:950;color:#000080;line-height:1.18">जय हिंद गणेश मित्र मंडळ, परभणी</div>
-          <div style="font-size:20px;font-weight:900;color:#138808;margin-top:6px">गणेशोत्सव ऑनलाइन प्रश्नमंजुषा • निकाल</div>
+      const page=`<section style="width:794px;min-height:1123px;background:#fff;padding:26px 24px 40px;box-sizing:border-box;color:#17251b;font-family:system-ui,-apple-system,'Noto Sans Devanagari','Segoe UI',sans-serif;position:relative">
+        <div style="height:9px;background:linear-gradient(90deg,#FF9933 0 33.33%,#ffffff 33.33% 66.66%,#138808 66.66%);border:1px solid #e8e8e8;border-radius:999px;margin-bottom:14px"></div>
+
+        <div style="text-align:center;border-bottom:3px solid #000080;padding-bottom:11px;margin-bottom:12px">
+          <div style="font-size:29px;font-weight:950;color:#000080;line-height:1.15">जय हिंद गणेश मित्र मंडळ, परभणी</div>
+          <div style="font-size:19px;font-weight:900;color:#138808;margin-top:5px">गणेशोत्सव ऑनलाइन प्रश्नमंजुषा • निकाल</div>
         </div>
 
-        <div style="display:flex;justify-content:space-between;gap:12px;margin-bottom:14px;font-size:16px;font-weight:850;background:#fff7e8;border:1px solid #f0d8b1;border-radius:12px;padding:10px 14px">
-          <div>दिनांक: <b>${reportEsc(prettyDate(date))}</b></div>
-          <div>एकूण स्पर्धक: <b>${rows.length}</b></div>
+        <div style="display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:8px;margin-bottom:12px;font-size:15px;font-weight:850">
+          <div style="background:#fff7e8;border:1px solid #f0d8b1;border-radius:10px;padding:9px 11px">
+            दिनांक: <b>${reportEsc(prettyDate(date))}</b>
+          </div>
+          <div style="background:#eef8ef;border:1px solid #c6dfc8;border-radius:10px;padding:9px 11px;text-align:center">
+            एकूण स्पर्धक: <b>${rows.length}</b>
+          </div>
+          <div style="background:#eef1ff;border:1px solid #cbd1ef;border-radius:10px;padding:9px 11px;text-align:center">
+            एकूण गुण: <b>10</b>
+          </div>
         </div>
 
-        <table style="width:100%;border-collapse:collapse;border:2px solid #25362b;font-size:16px">
+        <table style="width:100%;max-width:100%;min-width:0!important;table-layout:fixed;border-collapse:collapse;border:2px solid #25362b;font-size:14px;overflow:hidden">
+          <colgroup>
+            <col style="width:8%">
+            <col style="width:6%">
+            <col style="width:44%">
+            <col style="width:14%">
+            <col style="width:28%">
+          </colgroup>
           <thead>
-            <tr style="background:#f1f6ef;color:#17251b;height:40px">
-              <th style="border:1px solid #53645a;padding:8px">क्र.</th>
-              <th style="border:1px solid #53645a;padding:8px;text-align:left">नाव</th>
-              <th style="border:1px solid #53645a;padding:8px">गुण</th>
-              <th style="border:1px solid #53645a;padding:8px">वेळ</th>
+            <tr style="background:#f1f6ef;color:#17251b;height:42px">
+              <th style="border:1px solid #53645a;padding:6px">फोटो</th>
+              <th style="border:1px solid #53645a;padding:6px">क्र.</th>
+              <th style="border:1px solid #53645a;padding:6px;text-align:left">नाव</th>
+              <th style="border:1px solid #53645a;padding:5px 3px;line-height:1.15">मिळालेले<br>गुण</th>
+              <th style="border:1px solid #53645a;padding:5px 3px;line-height:1.15">लागलेला<br>वेळ</th>
             </tr>
           </thead>
           <tbody>
@@ -1673,7 +1702,9 @@ async function generateShortPrintPdf(){
           </tbody>
         </table>
 
-        <div style="position:absolute;left:42px;right:42px;bottom:22px;border-top:1px solid #ddd;padding-top:8px;display:flex;justify-content:space-between;font-size:11px;color:#68736c">
+        <div style="margin-top:8px;font-size:11px;color:#6a746d;text-align:right">वेळ स्वरूप: मिनिटे:सेकंद</div>
+
+        <div style="position:absolute;left:24px;right:24px;bottom:18px;border-top:1px solid #ddd;padding-top:7px;display:flex;justify-content:space-between;font-size:11px;color:#68736c">
           <span>जय हिंद गणेश मित्र मंडळ, परभणी</span>
           <span>Page ${pageIndex+1} / ${chunks.length}</span>
         </div>
@@ -1682,14 +1713,22 @@ async function generateShortPrintPdf(){
     });
 
     if(document.fonts&&document.fonts.ready) await document.fonts.ready;
+    await new Promise(r=>setTimeout(r,250));
+
     const pages=[...host.children];
     const {jsPDF}=window.jspdf;
     const pdf=new jsPDF({orientation:"portrait",unit:"mm",format:"a4",compress:true});
 
     for(let i=0;i<pages.length;i++){
       if(i>0)pdf.addPage("a4","portrait");
-      const canvas=await html2canvas(pages[i],{scale:1.7,useCORS:true,backgroundColor:"#ffffff",logging:false});
-      const img=canvas.toDataURL("image/jpeg",0.92);
+      const canvas=await html2canvas(pages[i],{
+        scale:1.8,
+        useCORS:true,
+        allowTaint:true,
+        backgroundColor:"#ffffff",
+        logging:false
+      });
+      const img=canvas.toDataURL("image/jpeg",0.94);
       pdf.addImage(img,"JPEG",0,0,210,297,undefined,"FAST");
     }
 
