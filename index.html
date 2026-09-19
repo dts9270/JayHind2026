@@ -8,6 +8,7 @@
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
@@ -92,16 +93,6 @@ th{background:#fff2db;position:sticky;top:0}
 .rankbig{font-size:30px;font-weight:950;color:#845a00}
 .resultq{border:1px solid var(--line);border-radius:15px;padding:12px;margin:9px 0;background:#fffefb}
 .resultq.good{border-left:5px solid var(--green)}.resultq.bad{border-left:5px solid var(--red)}
-
-.answer-modal{position:fixed;inset:0;background:rgba(0,0,0,.62);z-index:120;display:flex;align-items:flex-start;justify-content:center;padding:18px;overflow:auto}
-.answer-modal.hidden{display:none}
-.answer-sheet{width:min(760px,100%);background:#fffdf8;border-radius:22px;padding:18px;box-shadow:0 20px 70px rgba(0,0,0,.35);margin:auto}
-.answer-sheet-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:12px}
-.answer-review-item{border:1px solid #e8e1d7;border-radius:14px;padding:11px;margin:9px 0;background:#fff}
-.answer-review-item.good{border-left:5px solid var(--green)}
-.answer-review-item.bad{border-left:5px solid var(--red)}
-.answer-review-q{font-weight:900;color:var(--navy);margin-bottom:7px;line-height:1.4}
-.answer-review-line{font-size:13px;line-height:1.5;margin:3px 0}
 .top-admin{position:fixed;right:12px;bottom:12px;z-index:50}
 .top-admin button{opacity:.8}
 .toast{position:fixed;left:50%;bottom:25px;transform:translateX(-50%);z-index:100;background:#1d241f;color:#fff;padding:11px 14px;border-radius:13px;display:none;max-width:92vw}
@@ -109,8 +100,17 @@ th{background:#fff2db;position:sticky;top:0}
 .codehint{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#f7f2ec;padding:10px;border-radius:12px;overflow:auto}
 .small{font-size:12px}
 
-
-
+.photo-wrap{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.photo-preview{
+  width:112px;height:112px;border-radius:18px;object-fit:cover;
+  border:2px solid #e4d7c7;background:#f7f1e8;display:none
+}
+.photo-preview.show{display:block}
+.photo-mini{
+  width:46px;height:46px;border-radius:10px;object-fit:cover;
+  border:1px solid #ddd;background:#f4eee5
+}
+.photo-note{font-size:12px;color:var(--muted);line-height:1.45}
 
 
 .flowbox{margin-top:14px;border:1px solid var(--line);border-radius:20px;padding:14px;background:#fffefb}
@@ -125,10 +125,19 @@ th{background:#fff2db;position:sticky;top:0}
 .flowstate{font-size:13px;color:var(--muted);margin-top:2px}
 @media(max-width:680px){.flowgrid{grid-template-columns:1fr}}
 
+
+/* Anti-Cheat Mode */
+body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#antiCheatWatermark{position:fixed;inset:0;z-index:9998;pointer-events:none;display:none;overflow:hidden;opacity:.085;font-weight:900;color:#14213d;font-size:18px;transform:rotate(-22deg)}
+#antiCheatWatermark .wmgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:70px 35px;width:140%;height:140%;margin:-20%}
+#antiCheatWatermark span{white-space:nowrap}
+#antiCheatNotice{position:fixed;left:12px;right:12px;top:12px;z-index:10000;display:none;background:#7a1111;color:#fff;border-radius:14px;padding:12px 14px;font-weight:900;text-align:center;box-shadow:0 8px 30px #0004}
 </style>
 </head>
 
 <body>
+<div id="antiCheatWatermark"><div class="wmgrid" id="wmGrid"></div></div>
+<div id="antiCheatNotice"></div>
 <div class="wrap">
   <section class="hero">
     <div class="kicker">गणेशोत्सव ज्ञानस्पर्धा</div>
@@ -156,7 +165,7 @@ th{background:#fff2db;position:sticky;top:0}
       2. प्रत्येक प्रश्नासाठी 30 सेकंद.<br>
       3. एकदा पुढे गेल्यावर मागे जाता येणार नाही.<br>
       4. एक मोबाईल नंबर = एकच प्रयत्न.<br>
-      5. नाव व मोबाईल आवश्यक.
+      5. नाव, मोबाईल व चेहरा स्पष्ट दिसणारा फोटो आवश्यक.
     </div>
 
     <div id="entryForm" class="hidden">
@@ -169,11 +178,30 @@ th{background:#fff2db;position:sticky;top:0}
           <label>मोबाईल नंबर</label>
           <input id="pMobile" inputmode="numeric" maxlength="10" placeholder="10 अंकी नंबर">
         </div>
-</div>
+        <div>
+          <label>इयत्ता</label>
+          <select id="pClass">
+            <option value="5वी">5वी</option>
+            <option value="6वी">6वी</option>
+            <option value="7वी">7वी</option>
+            <option value="8वी">8वी</option>
+            <option value="9वी">9वी</option>
+            <option value="10वी">10वी</option>
+            <option value="11वी">11वी</option>
+            <option value="12वी">12वी</option>
+            <option value="इतर">इतर</option>
+          </select>
+        </div>
+        <div>
+          <label>उरलेला Entry Time</label>
+          <input id="entryCountdown" value="—" readonly>
+        </div>
+      </div>
       <div class="actions">
         <button id="startBtn" class="btn green">▶ START QUIZ</button>
         <button id="resumeBtn" class="btn light">↩ Resume</button>
       </div>
+      <div class="small" style="margin-top:8px">🔒 एका मोबाईल डिव्हाइसवरून दिवसाला फक्त 1 Entry. Camera/Video फक्त Quiz सुरू झाल्यानंतरच सुरू होईल.</div>
     </div>
 
     <div class="actions" style="justify-content:center">
@@ -188,9 +216,13 @@ th{background:#fff2db;position:sticky;top:0}
         <b id="qCounter">प्रश्न 1 / 10</b>
         <div id="participantName" class="muted"></div>
       </div>
-      <div id="timer" class="timer">30</div>
+      <div id="timer" class="timer">15</div>
     </div>
     <div class="progress"><i id="progressBar"></i></div>
+    <div id="cameraStrip" style="display:flex;align-items:center;gap:10px;margin:12px 0;padding:9px;border:1px solid #e8dfd2;border-radius:16px;background:#fff">
+      <video id="liveCamera" autoplay muted playsinline style="width:92px;height:72px;object-fit:cover;border-radius:12px;background:#111"></video>
+      <div><b>🔴 LIVE VIDEO</b><div class="small">Quiz चालू असताना camera recording सुरू आहे.</div><div id="videoStatus" class="small">Camera सुरू करत आहे...</div></div>
+    </div>
     <div id="questionText" class="question"></div>
     <div id="options" class="options"></div>
   </section>
@@ -336,7 +368,7 @@ th{background:#fff2db;position:sticky;top:0}
       </div>
       <div class="tablewrap" style="margin-top:12px">
         <table>
-          <thead><tr><th>नाव</th><th>मोबाईल</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
+          <thead><tr><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
           <tbody id="liveBody"></tbody>
         </table>
       </div>
@@ -368,7 +400,7 @@ th{background:#fff2db;position:sticky;top:0}
       <div class="tablewrap" style="margin-top:14px">
         <table>
           <thead>
-            <tr><th>Rank</th><th>नाव</th><th>मोबाईल</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
+            <tr><th>Rank</th><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>Class</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
@@ -387,19 +419,6 @@ th{background:#fff2db;position:sticky;top:0}
 
 <div class="top-admin"><button id="adminBtn" class="btn light">⚙ Admin</button></div>
 <div id="toast" class="toast"></div>
-<div id="answerModal" class="answer-modal hidden">
-  <div class="answer-sheet">
-    <div class="answer-sheet-head">
-      <div>
-        <div class="kicker">USER-WISE ANSWER REPORT</div>
-        <h2 id="answerModalTitle" style="margin:4px 0 2px">उत्तर तपशील</h2>
-        <div id="answerModalMeta" class="muted"></div>
-      </div>
-      <button class="btn red" onclick="closeUserAnswers()">✕ Close</button>
-    </div>
-    <div id="answerModalBody"></div>
-  </div>
-</div>
 
 <script>
 (() => {
@@ -421,14 +440,20 @@ const firebaseConfig = {
 const ROOT = "ganpati_quiz_v1";
 const ADMIN_PIN = "9270688372";
 const ENTRY_MINUTES = 60;
-const QUESTION_SECONDS = 30;
+const QUESTION_SECONDS = 15;
+const ANTI_CHEAT_MAX_VIOLATIONS = 2;
+let antiCheatActive=false, antiCheatLastEvent=0, antiCheatSubmitting=false;
 
-let db=null, connected=false;
+let db=null, storage=null, connected=false;
 let settings={quizDate:"",title:"",live:false,openUntil:0};
 let parsedSets={};
 let activeAttempt=null, activeQuestions=[], qIndex=0, qTimer=null;
 let resultsCache=[];
 let adminQuestionsReady=false;
+let participantPhotoPng="";
+let participantPhotoRaw="";
+let quizMediaStream=null, quizMediaRecorder=null, quizVideoChunks=[], quizVideoMime="";
+let quizVideoUploadPromise=null;
 
 /* =========================
    HELPERS
@@ -440,6 +465,7 @@ window.showHome=()=>{showOnly("homeView"); updatePublicStatus()}
 window.showMyResult=()=>{
   showOnly("resultView");
   $("rDate").value=yesterdayIST();
+
 
   $("resultDateLabel").textContent=`Default: ${prettyDate(yesterdayIST())} • कालची प्रश्नमंजुषा`;
   const m=$("pMobile").value.trim(); if(m) $("rMobile").value=m;
@@ -566,6 +592,28 @@ function prettyDate(s){
   return new Date(y,m-1,d).toLocaleDateString("mr-IN",{day:"numeric",month:"long",year:"numeric"});
 }
 function safeMobile(v){return String(v||"").replace(/\D/g,"").slice(-10)}
+async function browserDeviceId(){
+  // Web browsers cannot access IMEI. This privacy-safe fingerprint is used only to limit one entry per device/day.
+  const raw=[navigator.userAgent,navigator.platform,navigator.language,screen.width+"x"+screen.height,screen.colorDepth,navigator.hardwareConcurrency||"",navigator.deviceMemory||"",navigator.maxTouchPoints||"",Intl.DateTimeFormat().resolvedOptions().timeZone||""].join("|");
+  try{
+    const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(raw));
+    return "dev_"+Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("").slice(0,24);
+  }catch(e){
+    let h=2166136261; for(let i=0;i<raw.length;i++){h^=raw.charCodeAt(i);h=Math.imul(h,16777619)}
+    return "dev_"+(h>>>0).toString(16);
+  }
+}
+async function claimDeviceForQuiz(date,mobile){
+  const deviceId=await browserDeviceId();
+  const ref=db.ref(`${ROOT}/deviceClaims/${date}/${deviceId}`);
+  const tx=await ref.transaction(cur=>{
+    if(cur && cur.mobile && cur.mobile!==mobile) return;
+    return cur||{mobile,claimedAt:Date.now()};
+  });
+  const val=tx.snapshot&&tx.snapshot.val?tx.snapshot.val():null;
+  if(!tx.committed || !val || val.mobile!==mobile) return {ok:false,deviceId,claimedBy:val&&val.mobile};
+  return {ok:true,deviceId};
+}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
 function fmtDuration(ms){const s=Math.max(0,Math.round((ms||0)/1000));return `${Math.floor(s/60)}:${pad(s%60)}`}
 function fmtTime(ts){return ts?new Date(ts).toLocaleTimeString("mr-IN",{hour:"2-digit",minute:"2-digit",second:"2-digit"}):"—"}
@@ -577,6 +625,73 @@ function normalizeList(v){
 }
 function answerIndex(letter){return ["A","B","C","D"].indexOf(String(letter).trim().toUpperCase())}
 
+function fileToDataUrl(file){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=()=>reject(new Error("फोटो वाचता आला नाही."));
+    r.readAsDataURL(file);
+  });
+}
+function loadImage(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>resolve(img);
+    img.onerror=()=>reject(new Error("फोटो उघडता आला नाही."));
+    img.src=src;
+  });
+}
+async function stampPhotoDataUrl(src,size=320,name="",mobile=""){
+  const img=await loadImage(src);
+  if(img.naturalWidth<180 || img.naturalHeight<180){
+    throw new Error("फोटोची quality कमी आहे. चेहरा स्पष्ट दिसणारा फोटो घ्या.");
+  }
+
+  const side=Math.min(img.naturalWidth,img.naturalHeight);
+  const sx=(img.naturalWidth-side)/2;
+  const sy=(img.naturalHeight-side)/2;
+
+  const canvas=document.createElement("canvas");
+  canvas.width=size; canvas.height=size;
+  const ctx=canvas.getContext("2d");
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,size,size);
+  ctx.drawImage(img,sx,sy,side,side,0,0,size,size);
+
+  const stripH=58;
+  ctx.fillStyle="rgba(255,255,255,.86)";
+  ctx.fillRect(0,size-stripH,size,stripH);
+  ctx.fillStyle="#111";
+  ctx.textBaseline="top";
+  const nm=(name||"नाम").trim().slice(0,24);
+  const mob=(mobile||"मोबाईल").trim().slice(0,10);
+  ctx.font="bold 17px system-ui, sans-serif";
+  ctx.fillText(nm,10,size-stripH+8,size-20);
+  ctx.font="bold 14px system-ui, sans-serif";
+  ctx.fillText(mob,10,size-stripH+31,size-20);
+
+  return canvas.toDataURL("image/png");
+}
+async function updateParticipantPhotoPreview(){
+  if(!participantPhotoRaw) return;
+  const name=$("pName").value.trim();
+  const mobile=safeMobile($("pMobile").value);
+  participantPhotoPng=await stampPhotoDataUrl(participantPhotoRaw,320,name,mobile);
+  const preview=$("pPhotoPreview");
+  preview.src=participantPhotoPng;
+  preview.classList.add("show");
+}
+function clearParticipantPhoto(){
+  participantPhotoPng="";
+  participantPhotoRaw="";
+  const input=$("pPhoto");
+  const preview=$("pPhotoPreview");
+  if(input) input.value="";
+  if(preview){
+    preview.removeAttribute("src");
+    preview.classList.remove("show");
+  }
+}
 
 async function chooseBalancedSet(date,sets){
   const setNames=Object.keys(sets||{}).sort();
@@ -675,7 +790,7 @@ function trialText(){
 ========================= */
 try{
   if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-  db=firebase.database();
+  db=firebase.database(); storage=firebase.storage();
   forceOnline();
 
   db.ref(".info/connected").on("value", snap=>{
@@ -781,6 +896,9 @@ function updatePublicStatus(){
 }
 setInterval(()=>{
   const left=Math.max(0,Number(settings.openUntil||0)-Date.now());
+  $("entryCountdown").value=settings.live&&left>0
+    ?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`
+    :(settings.startedAt?"ENTRY CLOSED":"—");
   $("statTime").textContent=settings.live&&left>0
     ?`${Math.floor(left/60000)}:${pad(Math.ceil((left%60000)/1000))}`
     :(settings.startedAt?"CLOSED":"—");
@@ -966,9 +1084,11 @@ $("reloadAdminBtn").onclick=async()=>{
    PARTICIPANT START/RESUME
 ========================= */
 $("startBtn").onclick=async()=>{
+  await enterQuizFullscreen();
   try{await beginParticipant(false)}catch(err){console.error(err);toast("Quiz सुरू झाला नाही: Firebase/Internet तपासा")}
 };
 $("resumeBtn").onclick=async()=>{
+  await enterQuizFullscreen();
   try{await beginParticipant(true)}catch(err){console.error(err);toast("Resume झाला नाही: Firebase/Internet तपासा")}
 };
 
@@ -978,6 +1098,7 @@ async function beginParticipant(resumeOnly){
 
   const name=$("pName").value.trim();
   const mobile=safeMobile($("pMobile").value);
+  const cls=$("pClass").value;
 
   if(!/^[6-9]\d{9}$/.test(mobile))return toast("योग्य 10 अंकी मोबाईल नंबर भरा.");
 
@@ -996,10 +1117,12 @@ async function beginParticipant(resumeOnly){
   if(resumeOnly)return toast("या मोबाईल नंबरसाठी सुरू केलेला Quiz सापडला नाही.");
   if(!settings.live||Date.now()>=Number(settings.openUntil||0))return toast("आजची नवीन Entry बंद आहे.");
   if(name.length<2)return toast("पूर्ण नाव भरा.");
+
+  const deviceClaim=await claimDeviceForQuiz(date,mobile);
+  if(!deviceClaim.ok)return toast("या मोबाईल डिव्हाइसवरून आजची Quiz Entry आधीच घेतली आहे.");
+
   const sets=await dataGet(`days/${date}/public/sets`);
-  if(!sets){
-    return toast("Questions उपलब्ध नाहीत.");
-  }
+  if(!sets)return toast("Questions उपलब्ध नाहीत.");
   const setName=await chooseBalancedSet(date,sets);
   const qs=normalizeList(sets[setName]);
   if(qs.length!==10)return toast("या Set मध्ये 10 प्रश्न उपलब्ध नाहीत.");
@@ -1008,12 +1131,61 @@ async function beginParticipant(resumeOnly){
   questionOrder.forEach(qi=>optionOrders[qi]=shuffle([0,1,2,3]));
 
   const attempt={
-    name,mobile,setName,status:"started",startedAt:Date.now(),
+    name,mobile,className:cls,photoPng:"",deviceId:deviceClaim.deviceId,setName,status:"started",startedAt:Date.now(),
     currentIndex:0,questionStartedAt:Date.now(),questionOrder,optionOrders,answers:{}
   };
   await dataSet(attemptPath,attempt);
   localStorage.setItem("ganpati_active",JSON.stringify({date,mobile}));
   resumeAttempt(attempt,date,mobile);
+}
+
+async function startQuizVideo(){
+  try{
+    if(quizMediaStream) return true;
+    if(!navigator.mediaDevices?.getUserMedia) throw new Error("Camera API उपलब्ध नाही");
+    quizMediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:480},height:{ideal:640}},audio:false});
+    const v=$("liveCamera"); if(v){v.srcObject=quizMediaStream; await v.play().catch(()=>{});}
+    quizVideoChunks=[];
+    const preferred=["video/webm;codecs=vp8","video/webm","video/mp4"];
+    quizVideoMime=preferred.find(x=>window.MediaRecorder&&MediaRecorder.isTypeSupported(x))||"";
+    quizMediaRecorder=new MediaRecorder(quizMediaStream,quizVideoMime?{mimeType:quizVideoMime}:undefined);
+    quizMediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)quizVideoChunks.push(e.data)};
+    quizMediaRecorder.start(1000);
+    if($("videoStatus")) $("videoStatus").textContent="Recording चालू • Admin साठी save होईल";
+    return true;
+  }catch(e){
+    if($("videoStatus")) $("videoStatus").textContent="Camera permission आवश्यक आहे";
+    toast("Quiz साठी Camera permission Allow करा.");
+    return false;
+  }
+}
+
+async function stopAndSaveQuizVideo(){
+  if(!quizMediaRecorder||!activeAttempt) return null;
+  const a={...activeAttempt};
+  return new Promise(resolve=>{
+    const rec=quizMediaRecorder;
+    rec.onstop=async()=>{
+      try{
+        const mime=rec.mimeType||quizVideoMime||"video/webm";
+        const ext=mime.includes("mp4")?"mp4":"webm";
+        const blob=new Blob(quizVideoChunks,{type:mime});
+        if(blob.size<1000) throw new Error("Video रिकामा आहे");
+        const ref=storage.ref(`${ROOT}/quizVideos/${a.date}/${a.mobile}_${Date.now()}.${ext}`);
+        const snap=await ref.put(blob,{contentType:mime,customMetadata:{name:a.name||"",mobile:a.mobile||"",quizDate:a.date||""}});
+        const url=await snap.ref.getDownloadURL();
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUrl:url,videoSavedAt:Date.now(),videoBytes:blob.size});
+        resolve(url);
+      }catch(e){
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoSaveError:String(e.message||e)}).catch(()=>{});
+        resolve(null);
+      }finally{
+        quizMediaStream?.getTracks().forEach(t=>t.stop());
+        quizMediaStream=null;quizMediaRecorder=null;quizVideoChunks=[];
+      }
+    };
+    if(rec.state!=="inactive") rec.stop(); else rec.onstop();
+  });
 }
 
 async function resumeAttempt(attempt,date,mobile){
@@ -1027,7 +1199,10 @@ async function resumeAttempt(attempt,date,mobile){
   if(activeAttempt.questionOrder.length!==10) activeAttempt.questionOrder=[0,1,2,3,4,5,6,7,8,9];
   qIndex=Number(attempt.currentIndex||0);
   showOnly("quizView");
-  $("participantName").textContent=attempt.name;
+  const cameraOK=await startQuizVideo();
+  if(!cameraOK){ showOnly("homeView"); return; }
+  $("participantName").textContent=`${attempt.name} • ${attempt.className||""}`;
+  activateAntiCheat();
   renderActiveQuestion();
 }
 
@@ -1079,16 +1254,78 @@ async function answerQuestion(qi,chosen){
 
 async function submitAttempt(){
   clearInterval(qTimer);
+  quizVideoUploadPromise=stopAndSaveQuizVideo();
   const submittedAt=Date.now();
   const elapsedMs=submittedAt-Number(activeAttempt.startedAt||submittedAt);
   await dataUpdate(`attempts/${activeAttempt.date}/${activeAttempt.mobile}`,{
     status:"submitted",submittedAt,elapsedMs,currentIndex:10
   });
-
   localStorage.removeItem("ganpati_active");
+  deactivateAntiCheat();
   showOnly("doneView");
-  $("doneMeta").innerHTML=`दिनांक: <b>${prettyDate(activeAttempt.date)}</b><br>नाव: <b>${esc(activeAttempt.name)}</b><br>Quiz Time: <b>${fmtDuration(elapsedMs)}</b>`;
+  $("doneMeta").innerHTML=`दिनांक: <b>${prettyDate(activeAttempt.date)}</b><br>नाव: <b>${esc(activeAttempt.name)}</b><br>Quiz Time: <b>${fmtDuration(elapsedMs)}</b><br>🎥 Video: <b>Admin साठी save होत आहे...</b>`;
+  quizVideoUploadPromise?.then(url=>{if(url && $("doneMeta")) $("doneMeta").innerHTML += `<br>🎥 Video: <b>Saved ✓</b>`;});
 }
+
+/* =========================
+   ANTI-CHEAT MODE
+========================= */
+async function enterQuizFullscreen(){
+  try{
+    if(document.fullscreenEnabled && !document.fullscreenElement) await document.documentElement.requestFullscreen();
+  }catch(e){ console.warn("Fullscreen unavailable",e); }
+}
+function activateAntiCheat(){
+  antiCheatActive=true; antiCheatSubmitting=false;
+  document.body.classList.add("quiz-secure");
+  const label=`${activeAttempt.name||"Participant"} • ${String(activeAttempt.mobile||"").slice(-4)} • ${activeAttempt.setName||""}`;
+  const grid=$("wmGrid"); if(grid){grid.innerHTML=Array.from({length:36},()=>`<span>${esc(label)}</span>`).join("");}
+  $("antiCheatWatermark").style.display="block";
+}
+function deactivateAntiCheat(){
+  antiCheatActive=false;
+  document.body.classList.remove("quiz-secure");
+  $("antiCheatWatermark").style.display="none";
+  $("antiCheatNotice").style.display="none";
+  if(document.fullscreenElement){ try{document.exitFullscreen()}catch(e){} }
+}
+function showAntiCheatWarning(msg){
+  const n=$("antiCheatNotice"); n.textContent=msg; n.style.display="block";
+  setTimeout(()=>{if(n)n.style.display="none"},2200);
+}
+async function registerViolation(type){
+  if(!antiCheatActive || !activeAttempt || antiCheatSubmitting)return;
+  const now=Date.now();
+  if(now-antiCheatLastEvent<2500)return; // avoid double-counting one app/tab switch
+  antiCheatLastEvent=now;
+  const path=`attempts/${activeAttempt.date}/${activeAttempt.mobile}`;
+  let count=Number(activeAttempt.violationCount||0)+1;
+  activeAttempt.violationCount=count;
+  const log={...(activeAttempt.antiCheatLog||{})}; log[now]={type,at:now,q:qIndex+1}; activeAttempt.antiCheatLog=log;
+  await dataUpdate(path,{violationCount:count,antiCheatLog:log,lastViolationAt:now});
+  if(count>=ANTI_CHEAT_MAX_VIOLATIONS){
+    antiCheatSubmitting=true;
+    showAntiCheatWarning("⚠️ Quiz screen वारंवार सोडल्यामुळे Quiz Auto-Submit होत आहे.");
+    setTimeout(()=>submitAttempt(),700);
+  }else{
+    showAntiCheatWarning(`⚠️ Quiz screen सोडू नका. Warning ${count}/${ANTI_CHEAT_MAX_VIOLATIONS}`);
+    if(type!=="fullscreen-exit") enterQuizFullscreen();
+  }
+}
+document.addEventListener("visibilitychange",()=>{
+  if(antiCheatActive && document.hidden) registerViolation("tab/app-switch");
+});
+document.addEventListener("fullscreenchange",()=>{
+  if(antiCheatActive && !document.fullscreenElement) registerViolation("fullscreen-exit");
+});
+["copy","cut","paste","contextmenu","dragstart"].forEach(ev=>document.addEventListener(ev,e=>{
+  if(antiCheatActive){e.preventDefault();showAntiCheatWarning("⚠️ Copy / Paste / Right-click Quiz मध्ये बंद आहे.");}
+}));
+document.addEventListener("keydown",e=>{
+  if(!antiCheatActive)return;
+  const k=e.key.toLowerCase();
+  if((e.ctrlKey||e.metaKey)&&["c","v","x","p","s","u"].includes(k)){e.preventDefault();showAntiCheatWarning("⚠️ हा shortcut Quiz मध्ये बंद आहे.");}
+});
 
 /* =========================
    MY RESULT
@@ -1116,7 +1353,8 @@ async function loadMyResult(){
   }
   const cls=r.disqualified?"notice bad":"notice ok";
   let out=`<div class="${cls}">
-    <b>${esc(r.name)}</b><br>
+    ${r.photoPng?`<img class="photo-preview show" style="width:90px;height:90px;margin-bottom:8px" src="${r.photoPng}" alt="photo"><br>`:""}
+    <b>${esc(r.name)}</b> • ${esc(r.className||"")}<br>
     Score: <b>${r.score}/10</b> • Rank: <b>${r.disqualified?"DQ":"#"+r.rank}</b> • Time: <b>${fmtDuration(r.elapsedMs)}</b>
   </div>`;
   (r.review||[]).forEach((x,i)=>{
@@ -1193,8 +1431,9 @@ async function loadLive(){
   const body=$("liveBody");body.innerHTML="";
   Object.values(raw).sort((a,b)=>(b.startedAt||0)-(a.startedAt||0)).forEach(a=>{
     const tr=document.createElement("tr");
-    tr.innerHTML=`<td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.setName||"")}</td>
-      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
+    tr.innerHTML=`<td>${a.photoPng?`<img class="photo-mini" src="${a.photoPng}" alt="photo">`:"—"}</td>
+      <td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
+      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}<br><span class="small">🛡️ ${Number(a.violationCount||0)} warning${a.deviceId?` • 📱 ${esc(a.deviceId.slice(-6))}`:""}</span>${a.videoUrl?`<br><a href="${esc(a.videoUrl)}" target="_blank" rel="noopener">🎥 Video पाहा</a>`:(a.videoSaveError?`<br><span class="small" style="color:#c0392b">Video save failed</span>`:`<br><span class="small">Video pending</span>`)}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
       <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>`;
     body.appendChild(tr);
   });
@@ -1265,48 +1504,17 @@ function renderResults(rows,date){
   rows.forEach(r=>{
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${r.disqualified?"DQ":"#"+r.rank}</td>
-      <td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.setName)}</td>
+      <td>${r.photoPng?`<img class="photo-mini" src="${r.photoPng}" alt="photo">`:"—"}</td>
+      <td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.className||"")}</td><td>${esc(r.setName)}</td>
       <td><b>${r.score}/10</b></td><td>${fmtDuration(r.elapsedMs)}</td>
-      <td>${r.disqualified?"❌ Disqualified":r.verified?"✅ Verified":"Pending"}</td>
+      <td>${r.disqualified?"❌ Disqualified":r.verified?"✅ Verified":"Pending"}<br><span class="small">🛡️ Violations: ${Number(r.violationCount||0)}</span></td>
       <td>
-        <button class="btn saffron small" onclick="openUserAnswers('${date}','${r.mobile}')">Answers</button>
         <button class="btn light small" onclick="verifyUser('${date}','${r.mobile}',true)">Verify</button>
         <button class="btn red small" onclick="toggleDQ('${date}','${r.mobile}',${!r.disqualified})">${r.disqualified?"Restore":"DQ"}</button>
       </td>`;
     body.appendChild(tr);
   });
 }
-
-
-window.closeUserAnswers=()=>{
-  $("answerModal").classList.add("hidden");
-};
-
-window.openUserAnswers=async(date,mobile)=>{
-  let row=resultsCache.find(r=>String(r.mobile)===String(mobile));
-  if(!row){
-    const rows=await computeResults(date);
-    row=rows.find(r=>String(r.mobile)===String(mobile));
-  }
-  if(!row){
-    toast("User answer data सापडला नाही.");
-    return;
-  }
-  $("answerModalTitle").textContent=row.name||"Participant";
-  $("answerModalMeta").textContent=`${row.mobile||""} • Set ${row.setName||"-"} • Score ${row.score||0}/${(row.review||[]).length||10}`;
-  const review=row.review||[];
-  $("answerModalBody").innerHTML=review.length?review.map((x,i)=>`
-    <div class="answer-review-item ${x.correct?"good":"bad"}">
-      <div class="answer-review-q">${i+1}. ${esc(x.question||"")}</div>
-      <div class="answer-review-line"><b>User Answer:</b> ${esc(x.selectedText||"उत्तर दिले नाही")}</div>
-      <div class="answer-review-line"><b>Correct Answer:</b> ${esc(x.correctText||"-")}</div>
-      <div class="answer-review-line"><b>Result:</b> ${x.correct?"✅ Correct":"❌ Wrong"}</div>
-      ${x.explanation?`<div class="answer-review-line muted"><b>Explanation:</b> ${esc(x.explanation)}</div>`:""}
-    </div>
-  `).join(""):'<div class="notice">Answer review उपलब्ध नाही.</div>';
-  $("answerModal").classList.remove("hidden");
-};
-$("answerModal").addEventListener("click",e=>{if(e.target===$("answerModal"))closeUserAnswers()});
 
 window.verifyUser=async(date,mobile,val)=>{
   await dataSet(`attempts/${date}/${mobile}/verified`,!!val);
@@ -1326,8 +1534,8 @@ async function publishResults(){
   if(!rows.length)return toast("Submitted attempts नाहीत.");
   const obj={};
   rows.forEach(r=>obj[r.mobile]={
-    name:r.name,mobile:r.mobile,setName:r.setName,score:r.score,rank:r.rank,
-    elapsedMs:r.elapsedMs,submittedAt:r.submittedAt,review:r.review,disqualified:r.disqualified,verified:!!r.verified
+    name:r.name,mobile:r.mobile,className:r.className||"",photoPng:r.photoPng||"",setName:r.setName,score:r.score,rank:r.rank,
+    elapsedMs:r.elapsedMs,submittedAt:r.submittedAt,review:r.review,disqualified:r.disqualified,verified:!!r.verified,violationCount:Number(r.violationCount||0),antiCheatLog:r.antiCheatLog||{}
   });
   await Promise.all([
     dataSet(`results/${date}`,obj),
@@ -1339,18 +1547,8 @@ async function publishResults(){
 
 function exportCsv(){
   if(!resultsCache.length)return toast("Preview Result आधी करा.");
-  const maxQ=Math.max(0,...resultsCache.map(r=>(r.review||[]).length));
-  const header=["Rank","Name","Mobile","Set","Score","Time","Status"];
-  for(let i=0;i<maxQ;i++)header.push(`Q${i+1} User Answer`,`Q${i+1} Correct Answer`,`Q${i+1} Result`);
-  const rows=[header];
-  resultsCache.forEach(r=>{
-    const base=[r.disqualified?"DQ":r.rank,r.name,r.mobile,r.setName,r.score,fmtDuration(r.elapsedMs),r.disqualified?"DQ":r.verified?"Verified":"Pending"];
-    for(let i=0;i<maxQ;i++){
-      const x=(r.review||[])[i];
-      base.push(x?x.selectedText:"",x?x.correctText:"",x?(x.correct?"Correct":"Wrong"):"");
-    }
-    rows.push(base);
-  });
+  const rows=[["Rank","Name","Mobile","Class","Set","Score","Time","Status","AntiCheat Violations"]];
+  resultsCache.forEach(r=>rows.push([r.disqualified?"DQ":r.rank,r.name,r.mobile,r.className,r.setName,r.score,fmtDuration(r.elapsedMs),r.disqualified?"DQ":r.verified?"Verified":"Pending",Number(r.violationCount||0)]));
   const csv=rows.map(r=>r.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n");
   const blob=new Blob(["\uFEFF"+csv],{type:"text/csv;charset=utf-8"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`Ganpati_Quiz_${$("resultAdminDate").value||istDate()}.csv`;a.click();URL.revokeObjectURL(a.href);
@@ -1360,6 +1558,11 @@ function exportCsv(){
 /* =========================
    DATE-WISE COLOUR PDF REPORT
 ========================= */
+function reportPhoto(src,size=48){
+  return src
+    ? `<img src="${src}" style="width:${size}px;height:${size}px;border-radius:10px;object-fit:cover;border:1px solid #ddd;background:#f6f2ea">`
+    : `<div style="width:${size}px;height:${size}px;border-radius:10px;background:#eee;display:flex;align-items:center;justify-content:center;color:#999;font-size:11px">No Photo</div>`;
+}
 function reportEsc(s){return esc(s)}
 function reportStatus(a,r){
   if(a.disqualified || (r&&r.disqualified)) return "DQ";
@@ -1455,8 +1658,8 @@ async function generateColourPdfReport(){
         <div style="border:1px solid #eadfce;border-radius:18px;padding:14px;background:#fffaf2">
           <div style="font-size:17px;font-weight:950;color:#000080;margin-bottom:10px">🏆 Top 3</div>
           ${top3.length?top3.map((r,i)=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:${i<top3.length-1?'1px dashed #dfd7ca':'none'}">
-            <div style="font-size:22px;width:34px">${["🥇","🥈","🥉"][i]}</div>
-            <div style="flex:1"><div style="font-weight:950">${reportEsc(r.name)}</div><div style="font-size:11px;color:#68736c">Set ${reportEsc(r.setName||"")}</div></div>
+            <div style="font-size:22px;width:34px">${["🥇","🥈","🥉"][i]}</div>${reportPhoto(r.photoPng,46)}
+            <div style="flex:1"><div style="font-weight:950">${reportEsc(r.name)}</div><div style="font-size:11px;color:#68736c">${reportEsc(r.className||"")} • Set ${reportEsc(r.setName||"")}</div></div>
             <div style="text-align:right"><b style="font-size:18px;color:#138808">${r.score}/10</b><div style="font-size:10px;color:#68736c">${fmtDuration(r.elapsedMs)}</div></div>
           </div>`).join(""):`<div style="color:#777">Submitted result नाही.</div>`}
         </div>
@@ -1486,8 +1689,7 @@ async function generateColourPdfReport(){
     const perPage=11;
     const chunks=[];
     for(let i=0;i<ordered.length;i+=perPage) chunks.push(ordered.slice(i,i+perPage));
-    const answerRows=computed.filter(r=>(r.review||[]).length);
-    const totalPages=1+chunks.length+answerRows.length;
+    const totalPages=1+chunks.length;
     const title=meta.title||settings.title||"गणेशोत्सव प्रश्नमंजुषा";
 
     host=document.createElement("div");
@@ -1501,7 +1703,9 @@ async function generateColourPdfReport(){
         const r=byMobile[String(a.mobile)]||null;
         return `<tr style="height:61px">
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:850">${startNo+j}</td>
+          <td style="padding:5px;border-bottom:1px solid #ece7df">${reportPhoto(a.photoPng||(r&&r.photoPng)||"",42)}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df"><b>${reportEsc(a.name||"")}</b><div style="font-size:9px;color:#777">${reportEsc(a.mobile||"")}</div></td>
+          <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${reportEsc(a.className||"")}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:850">${reportEsc(a.setName||"-")}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center;font-weight:950;color:#000080">${r?r.score+"/10":"-"}</td>
           <td style="padding:6px;border-bottom:1px solid #ece7df;text-align:center">${r?fmtDuration(r.elapsedMs):"-"}</td>
@@ -1511,38 +1715,10 @@ async function generateColourPdfReport(){
       }).join("");
       const content=`<div style="font-size:18px;font-weight:950;color:#000080;margin-bottom:10px">Participant Detailed Report <span style="font-size:11px;color:#69726d;font-weight:700">(${startNo}-${startNo+chunk.length-1} of ${ordered.length})</span></div>
         <table style="width:100%;border-collapse:collapse;font-size:10px;border:1px solid #e8e1d6;border-radius:12px;overflow:hidden">
-          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:34px"><th>#</th><th style="text-align:left">Name / Mobile</th><th>Set</th><th>Score</th><th>Time</th><th>Rank</th><th>Status</th></tr></thead>
+          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:34px"><th>#</th><th>Photo</th><th style="text-align:left">Name / Mobile</th><th>Class</th><th>Set</th><th>Score</th><th>Time</th><th>Rank</th><th>Status</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>`;
       host.insertAdjacentHTML("beforeend",reportShell(content,idx+2,totalPages,date,title));
-    });
-
-    answerRows.forEach((r,idx)=>{
-      const review=r.review||[];
-      const answerTable=review.map((x,i)=>`
-        <tr>
-          <td style="width:28px;padding:6px;border-bottom:1px solid #eee;text-align:center;font-weight:900">${i+1}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;line-height:1.3">${reportEsc(x.question||"")}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;line-height:1.3;color:${x.correct?"#138808":"#b42318"};font-weight:800">${reportEsc(x.selectedText||"उत्तर दिले नाही")}</td>
-          <td style="padding:6px;border-bottom:1px solid #eee;line-height:1.3;font-weight:800">${reportEsc(x.correctText||"-")}</td>
-          <td style="width:55px;padding:6px;border-bottom:1px solid #eee;text-align:center;font-weight:950;color:${x.correct?"#138808":"#b42318"}">${x.correct?"✓":"✗"}</td>
-        </tr>`).join("");
-      const answerContent=`
-        <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-end;margin-bottom:10px">
-          <div>
-            <div style="font-size:18px;font-weight:950;color:#000080">User-wise Answer Report</div>
-            <div style="font-size:14px;font-weight:900;margin-top:4px">${reportEsc(r.name||"")}</div>
-            <div style="font-size:10px;color:#69726d">${reportEsc(r.mobile||"")} • Set ${reportEsc(r.setName||"-")}</div>
-          </div>
-          <div style="text-align:right"><div style="font-size:22px;font-weight:950;color:#138808">${r.score}/${review.length}</div><div style="font-size:10px;color:#69726d">${r.disqualified?"DQ":r.verified?"Verified":"Submitted"}</div></div>
-        </div>
-        <table style="width:100%;border-collapse:collapse;font-size:9.5px;border:1px solid #e8e1d6">
-          <thead><tr style="background:linear-gradient(90deg,#fff0d7,#f4fff2);height:32px">
-            <th>#</th><th style="text-align:left;padding:6px">Question</th><th style="text-align:left;padding:6px">User Answer</th><th style="text-align:left;padding:6px">Correct Answer</th><th>Result</th>
-          </tr></thead>
-          <tbody>${answerTable}</tbody>
-        </table>`;
-      host.insertAdjacentHTML("beforeend",reportShell(answerContent,2+chunks.length+idx,totalPages,date,title));
     });
 
     if(document.fonts&&document.fonts.ready) await document.fonts.ready;
@@ -1589,7 +1765,7 @@ async function generateShortPrintPdf(){
     const rows=(await computeResults(date)).filter(r=>!r.disqualified);
     if(!rows.length) throw new Error("या तारखेसाठी submitted result नाही.");
 
-    // Clean print report: 18 participants per A4 page.
+    // Photo असलेला clean print report: 18 participants per A4 page.
     const perPage=18;
     const chunks=[];
     for(let i=0;i<rows.length;i+=perPage) chunks.push(rows.slice(i,i+perPage));
@@ -1608,6 +1784,12 @@ async function generateShortPrintPdf(){
 
       const tableRows=chunk.map((r,i)=>`
         <tr style="height:56px">
+          <td style="border:1px solid #738178;padding:4px;text-align:center;overflow:hidden">
+            ${r.photoPng
+              ? `<img src="${r.photoPng}" alt="photo" style="width:40px;height:40px;object-fit:cover;border-radius:7px;border:1px solid #cfcfcf;display:block;margin:auto">`
+              : `<div style="width:40px;height:40px;border-radius:7px;background:#f1f1f1;border:1px solid #ddd;margin:auto;display:flex;align-items:center;justify-content:center;font-size:10px;color:#777">PHOTO</div>`
+            }
+          </td>
           <td style="border:1px solid #738178;padding:6px;text-align:center;font-weight:900;overflow:hidden">${r.rank||startNo+i+1}</td>
           <td style="border:1px solid #738178;padding:5px 6px;font-weight:850;line-height:1.15;word-break:break-word;font-size:13px;overflow:hidden">${reportEsc(r.name||"")}</td>
           <td style="border:1px solid #738178;padding:6px;text-align:center;font-size:18px;font-weight:950;overflow:hidden;color:#000080">${Number(r.score||0)}</td>
@@ -1637,12 +1819,14 @@ async function generateShortPrintPdf(){
         <table style="width:100%;max-width:100%;min-width:0!important;table-layout:fixed;border-collapse:collapse;border:2px solid #25362b;font-size:14px;overflow:hidden">
           <colgroup>
             <col style="width:8%">
-            <col style="width:48%">
-            <col style="width:16%">
+            <col style="width:6%">
+            <col style="width:44%">
+            <col style="width:14%">
             <col style="width:28%">
           </colgroup>
           <thead>
             <tr style="background:#f1f6ef;color:#17251b;height:42px">
+              <th style="border:1px solid #53645a;padding:6px">फोटो</th>
               <th style="border:1px solid #53645a;padding:6px">क्र.</th>
               <th style="border:1px solid #53645a;padding:6px;text-align:left">नाव</th>
               <th style="border:1px solid #53645a;padding:5px 3px;line-height:1.15">मिळालेले<br>गुण</th>
@@ -1695,7 +1879,6 @@ async function generateShortPrintPdf(){
     btn.textContent=oldText;
   }
 }
-
 
 /* =========================
    ARCHIVE
