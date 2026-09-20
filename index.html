@@ -1108,7 +1108,7 @@ $("startBtn").onclick=async()=>{
   const btn=$("startBtn");
   try{
     btn.disabled=true; btn.textContent="⏳ STARTING...";
-    await enterQuizFullscreen();
+    enterQuizFullscreen();
     await beginParticipant(false);
   }catch(err){
     console.error("QUIZ START ERROR",err);
@@ -1118,7 +1118,7 @@ $("startBtn").onclick=async()=>{
   }
 };
 $("resumeBtn").onclick=async()=>{
-  await enterQuizFullscreen();
+  enterQuizFullscreen();
   try{await beginParticipant(true)}catch(err){console.error(err);toast("Resume झाला नाही: Firebase/Internet तपासा")}
 };
 
@@ -1168,9 +1168,7 @@ async function beginParticipant(resumeOnly){
   const qs=normalizeList(sets[setName]);
   if(qs.length!==10)throw new Error("निवडलेल्या Set मध्ये नेमके 10 प्रश्न उपलब्ध नाहीत.");
 
-  // Device claim करण्याआधी camera तपासा; त्यामुळे camera error मुळे entry/device lock होणार नाही.
-  await ensureCameraPermission();
-
+  // Quiz start ला camera मुळे block करू नका. Video quiz screen उघडल्यानंतर background मध्ये सुरू होईल.
   const deviceClaim=await claimDeviceForQuiz(date,mobile);
   if(!deviceClaim.ok)throw new Error("या मोबाईल डिव्हाइसवरून आजची Quiz Entry आधीच घेतली आहे.");
   const questionOrder=shuffle(qs.map((_,i)=>i));
@@ -1264,11 +1262,14 @@ async function resumeAttempt(attempt,date,mobile){
   if(activeAttempt.questionOrder.length!==10) activeAttempt.questionOrder=[0,1,2,3,4,5,6,7,8,9];
   qIndex=Number(attempt.currentIndex||0);
   showOnly("quizView");
-  const cameraOK=await startQuizVideo();
-  if(!cameraOK){ showOnly("homeView"); return; }
   $("participantName").textContent=`${attempt.name} • ${attempt.className||""}`;
   activateAntiCheat();
   renderActiveQuestion();
+  // प्रश्न त्वरित सुरू करा; camera/video background मध्ये सुरू होऊ द्या.
+  // Camera fail झाला तरी quiz थांबणार नाही.
+  startQuizVideo().then(ok=>{
+    if(!ok && $("videoStatus")) $("videoStatus").textContent="⚠️ Video सुरू झाला नाही • Quiz सुरू आहे";
+  }).catch(e=>console.warn("Background video start failed",e));
 }
 
 function renderActiveQuestion(){
