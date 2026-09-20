@@ -145,7 +145,7 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
     <p>Online प्रश्नमंजुषा • ज्ञान • वेग • अचूकता</p>
     <div class="badges">
       <span class="badge">10 प्रश्न</span>
-      <span class="badge">30 सेकंद / प्रश्न</span>
+      <span class="badge">15 सेकंद / प्रश्न</span>
       <span class="badge">एक मोबाईल • एक प्रयत्न</span>
     </div>
   </section>
@@ -162,10 +162,10 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
     <div class="notice" id="rulesBox">
       <b>स्पर्धेचे नियम</b><br>
       1. एकूण 10 प्रश्न.<br>
-      2. प्रत्येक प्रश्नासाठी 30 सेकंद.<br>
+      2. प्रत्येक प्रश्नासाठी 15 सेकंद.<br>
       3. एकदा पुढे गेल्यावर मागे जाता येणार नाही.<br>
       4. एक मोबाईल नंबर = एकच प्रयत्न.<br>
-      5. नाव, मोबाईल व चेहरा स्पष्ट दिसणारा फोटो आवश्यक.
+      5. START QUIZ दाबल्यानंतर Front Camera Video सुरू होईल; Camera permission आवश्यक आहे.
     </div>
 
     <div id="entryForm" class="hidden">
@@ -1142,7 +1142,9 @@ async function beginParticipant(resumeOnly){
 async function startQuizVideo(){
   try{
     if(quizMediaStream) return true;
+    if(!window.isSecureContext) throw new Error("Camera साठी HTTPS आवश्यक आहे");
     if(!navigator.mediaDevices?.getUserMedia) throw new Error("Camera API उपलब्ध नाही");
+    if(typeof MediaRecorder === "undefined") throw new Error("या browser मध्ये Video Recording support नाही");
     quizMediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:480},height:{ideal:640}},audio:false});
     const v=$("liveCamera"); if(v){v.srcObject=quizMediaStream; await v.play().catch(()=>{});}
     quizVideoChunks=[];
@@ -1151,11 +1153,13 @@ async function startQuizVideo(){
     quizMediaRecorder=new MediaRecorder(quizMediaStream,quizVideoMime?{mimeType:quizVideoMime}:undefined);
     quizMediaRecorder.ondataavailable=e=>{if(e.data&&e.data.size)quizVideoChunks.push(e.data)};
     quizMediaRecorder.start(1000);
-    if($("videoStatus")) $("videoStatus").textContent="Recording चालू • Admin साठी save होईल";
+    if($("videoStatus")) $("videoStatus").textContent="🔴 Recording चालू • Admin साठी save होईल";
+    if(activeAttempt?.date && activeAttempt?.mobile){ dataUpdate(`attempts/${activeAttempt.date}/${activeAttempt.mobile}`,{videoRecording:true,videoStartedAt:Date.now()}).catch(()=>{}); }
     return true;
   }catch(e){
-    if($("videoStatus")) $("videoStatus").textContent="Camera permission आवश्यक आहे";
-    toast("Quiz साठी Camera permission Allow करा.");
+    console.error("VIDEO START ERROR",e);
+    if($("videoStatus")) $("videoStatus").textContent="Video सुरू झाला नाही: "+String(e.message||e);
+    toast("Camera/Video सुरू झाला नाही: "+String(e.message||e));
     return false;
   }
 }
@@ -1172,12 +1176,13 @@ async function stopAndSaveQuizVideo(){
         const blob=new Blob(quizVideoChunks,{type:mime});
         if(blob.size<1000) throw new Error("Video रिकामा आहे");
         const ref=storage.ref(`${ROOT}/quizVideos/${a.date}/${a.mobile}_${Date.now()}.${ext}`);
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUploadStatus:"uploading",videoBytes:blob.size}).catch(()=>{});
         const snap=await ref.put(blob,{contentType:mime,customMetadata:{name:a.name||"",mobile:a.mobile||"",quizDate:a.date||""}});
         const url=await snap.ref.getDownloadURL();
-        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUrl:url,videoSavedAt:Date.now(),videoBytes:blob.size});
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUrl:url,videoSavedAt:Date.now(),videoBytes:blob.size,videoUploadStatus:"saved",videoRecording:false});
         resolve(url);
       }catch(e){
-        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoSaveError:String(e.message||e)}).catch(()=>{});
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoSaveError:String(e.message||e),videoUploadStatus:"failed",videoRecording:false}).catch(()=>{});
         resolve(null);
       }finally{
         quizMediaStream?.getTracks().forEach(t=>t.stop());
@@ -1433,7 +1438,7 @@ async function loadLive(){
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${a.photoPng?`<img class="photo-mini" src="${a.photoPng}" alt="photo">`:"—"}</td>
       <td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
-      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}<br><span class="small">🛡️ ${Number(a.violationCount||0)} warning${a.deviceId?` • 📱 ${esc(a.deviceId.slice(-6))}`:""}</span>${a.videoUrl?`<br><a href="${esc(a.videoUrl)}" target="_blank" rel="noopener">🎥 Video पाहा</a>`:(a.videoSaveError?`<br><span class="small" style="color:#c0392b">Video save failed</span>`:`<br><span class="small">Video pending</span>`)}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
+      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}<br><span class="small">🛡️ ${Number(a.violationCount||0)} warning${a.deviceId?` • 📱 ${esc(a.deviceId.slice(-6))}`:""}</span>${a.videoUrl?`<br><a href="${esc(a.videoUrl)}" target="_blank" rel="noopener">🎥 Video पाहा</a>`:(a.videoSaveError?`<br><span class="small" style="color:#c0392b">Video save failed</span>`:`<br><span class="small">${a.videoRecording?"🔴 Recording":"Video pending"}${a.videoUploadStatus?" • "+esc(a.videoUploadStatus):""}</span>`)}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
       <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>`;
     body.appendChild(tr);
   });
