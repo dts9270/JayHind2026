@@ -327,7 +327,7 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
         </div>
         <div>
           <label>Quiz Title</label>
-          <input id="adminTitle" value="आजची Trial गणेशोत्सव प्रश्नमंजुषा">
+          <input id="adminTitle" value="आजची गणेशोत्सव प्रश्नमंजुषा">
         </div>
       </div>
 
@@ -335,7 +335,7 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
       <textarea id="bulkQuestions" rows="10" placeholder="SET A&#10;Q1|प्रश्न|A|B|C|D|योग्य पर्याय|स्पष्टीकरण"></textarea>
 
       <div class="actions">
-        <button id="trialFillBtn" class="btn saffron">🧪 आजचे Trial Questions</button>
+        <button id="trialFillBtn" class="btn saffron" style="display:none">Trial Questions</button>
         <button id="importBtn" class="btn light">① IMPORT</button>
         <button id="publishQuestionsBtn" class="btn gold">② PUBLISH</button>
         <button id="startAdminQuizBtn" class="btn green">③ START QUIZ • 1 तास</button>
@@ -346,14 +346,12 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
       </div>
 
       <div class="card" style="margin-top:14px;border:1px solid #ddd">
-        <b>🧪 Trial / Attempt Control</b>
-        <div class="small" style="margin-top:4px">Trial करताना एका मोबाईल/डिव्हाइसवरून पुन्हा Quiz द्यायची परवानगी Admin ठरवू शकतो.</div>
-        <div class="actions" style="align-items:center">
-          <label style="display:flex;align-items:center;gap:8px;margin:0"><input id="allowMultipleAttempts" type="checkbox" style="width:auto"> एका मोबाईल/डिव्हाइसवरून अनेक वेळा Quiz द्यायला Allow</label>
-          <button id="saveAttemptModeBtn" class="btn green">💾 SAVE MODE</button>
-          <button id="deleteTodayAttemptsBtn" class="btn red">🗑 आजचे सर्व Quiz Attempts Delete</button>
-        </div>
-        <div id="attemptModeStatus" class="notice">Mode loading...</div>
+        <b>🔒 Final Competition Control</b>
+        <div class="small" style="margin-top:4px">एका मोबाईल/डिव्हाइसवरून फक्त एकच Quiz attempt. Admin ला गरज असल्यास आजचे attempts reset करता येतील.</div>
+        <input id="allowMultipleAttempts" type="checkbox" style="display:none">
+        <button id="saveAttemptModeBtn" class="btn green" style="display:none">SAVE MODE</button>
+        <div class="actions"><button id="deleteTodayAttemptsBtn" class="btn red">🗑 आजचे सर्व Quiz Attempts Reset/Delete</button></div>
+        <div id="attemptModeStatus" class="notice">🔒 ONE ATTEMPT — Final Competition Mode</div>
       </div>
 
       <div id="questionPreview" class="grid" style="margin-top:14px"></div>
@@ -979,7 +977,7 @@ try{
   db.ref(`${ROOT}/settings/current`).on("value",s=>{
     settings=s.val()||{quizDate:"",title:"",live:false,openUntil:0};
     const modeBox=$("allowMultipleAttempts"); if(modeBox) modeBox.checked=!!settings.allowMultipleAttempts;
-    const modeSt=$("attemptModeStatus"); if(modeSt) modeSt.textContent=settings.allowMultipleAttempts?"🧪 MULTI ATTEMPT ON — Trial mode":"🔒 ONE ATTEMPT — Competition mode";
+    const modeSt=$("attemptModeStatus"); if(modeSt) modeSt.textContent="🔒 ONE ATTEMPT — Final Competition Mode";
     updatePublicStatus(); updateAdminStatus(); updateFlowStatus();
   }, err=>{
     console.error("SETTINGS READ ERROR", err);
@@ -1224,7 +1222,7 @@ $("startAdminQuizBtn").onclick=async()=>{
       return;
     }
     const title=$("adminTitle").value.trim()||"गणेशोत्सव प्रश्नमंजुषा";
-    const liveState={quizDate:date,title,live:true,startedAt:Date.now(),openUntil:Date.now()+ENTRY_MINUTES*60*1000,questionsReady:true,allowMultipleAttempts:!!settings.allowMultipleAttempts};
+    const liveState={quizDate:date,title,live:true,startedAt:Date.now(),openUntil:Date.now()+ENTRY_MINUTES*60*1000,questionsReady:true,allowMultipleAttempts:false};
     await dataSet("settings/current",liveState);
     settings=liveState;
     updatePublicStatus();
@@ -1240,12 +1238,12 @@ $("startAdminQuizBtn").onclick=async()=>{
 
 $("saveAttemptModeBtn").onclick=async()=>{
   if(!db)return toast("Firebase connect नाही");
-  const allow=!!$("allowMultipleAttempts").checked;
+  const allow=false;
   try{
     await dataUpdate("settings/current",{allowMultipleAttempts:allow});
-    settings={...settings,allowMultipleAttempts:allow};
-    $("attemptModeStatus").textContent=allow?"🧪 MULTI ATTEMPT ON — Trial mode":"🔒 ONE ATTEMPT — Competition mode";
-    toast(allow?"Multi Attempt ON":"One Attempt ON");
+    settings={...settings,allowMultipleAttempts:false};
+    $("attemptModeStatus").textContent="🔒 ONE ATTEMPT — Final Competition Mode";
+    toast("One Attempt ON");
   }catch(e){console.error(e);toast("Mode save failed")}
 };
 
@@ -1336,10 +1334,7 @@ async function beginParticipant(resumeOnly){
 
   if(old){
     if(old.status==="submitted"){
-      if(!settings.allowMultipleAttempts) return toast("या नंबरवरून Quiz आधीच submit झाला आहे.");
-      // Trial multi-attempt mode: previous attempt is cleared and a fresh attempt starts.
-      await dataRemove(attemptPath).catch(()=>{});
-      localStorage.removeItem("ganpati_active");
+      return toast("या नंबरवरून Quiz आधीच submit झाला आहे.");
     } else if(old.status==="started"){
       localStorage.setItem("ganpati_active",JSON.stringify({date,mobile}));
       return resumeAttempt(old,date,mobile);
