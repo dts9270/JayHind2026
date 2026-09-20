@@ -368,7 +368,7 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
       </div>
       <div class="tablewrap" style="margin-top:12px">
         <table>
-          <thead><tr><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>🎥 Video</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
+          <thead><tr><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>इयत्ता</th><th>Set</th><th>Status</th><th>Progress</th><th>Start</th><th>Submit</th></tr></thead>
           <tbody id="liveBody"></tbody>
         </table>
       </div>
@@ -400,7 +400,7 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
       <div class="tablewrap" style="margin-top:14px">
         <table>
           <thead>
-            <tr><th>Rank</th><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>Class</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>🎥 Video</th><th>Action</th></tr>
+            <tr><th>Rank</th><th>फोटो</th><th>नाव</th><th>मोबाईल</th><th>Class</th><th>Set</th><th>Score</th><th>वेळ</th><th>Status</th><th>Action</th></tr>
           </thead>
           <tbody id="resultBody"></tbody>
         </table>
@@ -418,12 +418,6 @@ body.quiz-secure{user-select:none;-webkit-user-select:none;-webkit-touch-callout
 </div>
 
 <div class="top-admin"><button id="adminBtn" class="btn light">⚙ Admin</button></div>
-<div id="videoModal" class="hidden" style="position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.82);padding:18px;overflow:auto">
-  <div style="max-width:720px;margin:30px auto;background:#fff;border-radius:20px;padding:14px">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b id="videoModalTitle">Quiz Video</b><button id="closeVideoModal" class="btn red">✕ बंद</button></div>
-    <video id="adminVideoPlayer" controls playsinline style="width:100%;max-height:70vh;background:#111;border-radius:14px;margin-top:12px"></video>
-  </div>
-</div>
 <div id="toast" class="toast"></div>
 
 <script>
@@ -460,8 +454,6 @@ let participantPhotoPng="";
 let participantPhotoRaw="";
 let quizMediaStream=null, quizMediaRecorder=null, quizVideoChunks=[], quizVideoMime="";
 let quizVideoUploadPromise=null;
-let quizLastVideoBlob=null;
-let quizLastVideoMeta=null;
 
 /* =========================
    HELPERS
@@ -479,19 +471,6 @@ window.showMyResult=()=>{
   const m=$("pMobile").value.trim(); if(m) $("rMobile").value=m;
   const n=$("pName").value.trim(); if(n) $("rName3").value=n.slice(0,3);
 }
-window.openQuizVideo=(url,name)=>{
-  const modal=$("videoModal"), player=$("adminVideoPlayer");
-  $("videoModalTitle").textContent=(name||"Participant")+" • Quiz Video";
-  player.src=url; modal.classList.remove("hidden");
-  player.play().catch(()=>{});
-};
-function closeQuizVideo(){
-  const modal=$("videoModal"), player=$("adminVideoPlayer");
-  player.pause(); player.removeAttribute("src"); player.load(); modal.classList.add("hidden");
-}
-$("closeVideoModal").addEventListener("click",closeQuizVideo);
-$("videoModal").addEventListener("click",e=>{if(e.target===$("videoModal"))closeQuizVideo()});
-
 function toast(msg){
   const t=$("toast");t.textContent=msg;t.style.display="block";
   clearTimeout(t._h);t._h=setTimeout(()=>t.style.display="none",2600)
@@ -1105,36 +1084,13 @@ $("reloadAdminBtn").onclick=async()=>{
    PARTICIPANT START/RESUME
 ========================= */
 $("startBtn").onclick=async()=>{
-  const btn=$("startBtn");
-  try{
-    btn.disabled=true; btn.textContent="⏳ STARTING...";
-    enterQuizFullscreen();
-    await beginParticipant(false);
-  }catch(err){
-    console.error("QUIZ START ERROR",err);
-    toast("Quiz सुरू झाला नाही: "+String(err.message||err));
-  }finally{
-    if($("homeView") && !$("homeView").classList.contains("hidden")){btn.disabled=false;btn.textContent="▶ START QUIZ";}
-  }
+  await enterQuizFullscreen();
+  try{await beginParticipant(false)}catch(err){console.error(err);toast("Quiz सुरू झाला नाही: Firebase/Internet तपासा")}
 };
 $("resumeBtn").onclick=async()=>{
-  enterQuizFullscreen();
+  await enterQuizFullscreen();
   try{await beginParticipant(true)}catch(err){console.error(err);toast("Resume झाला नाही: Firebase/Internet तपासा")}
 };
-
-async function ensureCameraPermission(){
-  if(quizMediaStream) return true;
-  if(!window.isSecureContext) throw new Error("Camera साठी HTTPS आवश्यक आहे. GitHub Pages link वापरा.");
-  if(!navigator.mediaDevices?.getUserMedia) throw new Error("या browser मध्ये Camera API उपलब्ध नाही.");
-  try{
-    quizMediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:480},height:{ideal:640}},audio:false});
-    return true;
-  }catch(e){
-    if(e && (e.name==="NotAllowedError" || e.name==="PermissionDeniedError")) throw new Error("Camera permission BLOCK आहे. Browser Settings मध्ये Camera Allow करा.");
-    if(e && e.name==="NotFoundError") throw new Error("Front camera सापडला नाही.");
-    throw new Error("Camera सुरू झाला नाही: "+String(e.message||e));
-  }
-}
 
 async function beginParticipant(resumeOnly){
   if(!db)return toast("Database initialize झालेली नाही.");
@@ -1162,15 +1118,14 @@ async function beginParticipant(resumeOnly){
   if(!settings.live||Date.now()>=Number(settings.openUntil||0))return toast("आजची नवीन Entry बंद आहे.");
   if(name.length<2)return toast("पूर्ण नाव भरा.");
 
+  const deviceClaim=await claimDeviceForQuiz(date,mobile);
+  if(!deviceClaim.ok)return toast("या मोबाईल डिव्हाइसवरून आजची Quiz Entry आधीच घेतली आहे.");
+
   const sets=await dataGet(`days/${date}/public/sets`);
-  if(!sets)throw new Error("Questions उपलब्ध नाहीत. Admin ने आजचे Sets Publish केले आहेत का तपासा.");
+  if(!sets)return toast("Questions उपलब्ध नाहीत.");
   const setName=await chooseBalancedSet(date,sets);
   const qs=normalizeList(sets[setName]);
-  if(qs.length!==10)throw new Error("निवडलेल्या Set मध्ये नेमके 10 प्रश्न उपलब्ध नाहीत.");
-
-  // Quiz start ला camera मुळे block करू नका. Video quiz screen उघडल्यानंतर background मध्ये सुरू होईल.
-  const deviceClaim=await claimDeviceForQuiz(date,mobile);
-  if(!deviceClaim.ok)throw new Error("या मोबाईल डिव्हाइसवरून आजची Quiz Entry आधीच घेतली आहे.");
+  if(qs.length!==10)return toast("या Set मध्ये 10 प्रश्न उपलब्ध नाहीत.");
   const questionOrder=shuffle(qs.map((_,i)=>i));
   const optionOrders={};
   questionOrder.forEach(qi=>optionOrders[qi]=shuffle([0,1,2,3]));
@@ -1179,23 +1134,18 @@ async function beginParticipant(resumeOnly){
     name,mobile,className:cls,photoPng:"",deviceId:deviceClaim.deviceId,setName,status:"started",startedAt:Date.now(),
     currentIndex:0,questionStartedAt:Date.now(),questionOrder,optionOrders,answers:{}
   };
-  try{
-    await dataSet(attemptPath,attempt);
-  }catch(e){
-    quizMediaStream?.getTracks().forEach(t=>t.stop()); quizMediaStream=null;
-    throw new Error("Attempt save झाला नाही. Firebase Database/Internet तपासा.");
-  }
+  await dataSet(attemptPath,attempt);
   localStorage.setItem("ganpati_active",JSON.stringify({date,mobile}));
-  await resumeAttempt(attempt,date,mobile);
+  resumeAttempt(attempt,date,mobile);
 }
 
 async function startQuizVideo(){
   try{
+    if(quizMediaStream) return true;
     if(!window.isSecureContext) throw new Error("Camera साठी HTTPS आवश्यक आहे");
     if(!navigator.mediaDevices?.getUserMedia) throw new Error("Camera API उपलब्ध नाही");
     if(typeof MediaRecorder === "undefined") throw new Error("या browser मध्ये Video Recording support नाही");
-    if(!quizMediaStream) quizMediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:480},height:{ideal:640}},audio:false});
-    if(quizMediaRecorder && quizMediaRecorder.state!=="inactive") return true;
+    quizMediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:480},height:{ideal:640}},audio:false});
     const v=$("liveCamera"); if(v){v.srcObject=quizMediaStream; await v.play().catch(()=>{});}
     quizVideoChunks=[];
     const preferred=["video/webm;codecs=vp8","video/webm","video/mp4"];
@@ -1225,19 +1175,11 @@ async function stopAndSaveQuizVideo(){
         const ext=mime.includes("mp4")?"mp4":"webm";
         const blob=new Blob(quizVideoChunks,{type:mime});
         if(blob.size<1000) throw new Error("Video रिकामा आहे");
-        quizLastVideoBlob=blob;
-        quizLastVideoMeta={...a,mime,ext};
         const ref=storage.ref(`${ROOT}/quizVideos/${a.date}/${a.mobile}_${Date.now()}.${ext}`);
-        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUploadStatus:"uploading",videoUploadProgress:0,videoBytes:blob.size,videoSaveError:null}).catch(()=>{});
-        const task=ref.put(blob,{contentType:mime,customMetadata:{name:a.name||"",mobile:a.mobile||"",quizDate:a.date||""}});
-        const snap=await new Promise((res,rej)=>task.on("state_changed",ss=>{
-          const pct=ss.totalBytes?Math.round((ss.bytesTransferred/ss.totalBytes)*100):0;
-          dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUploadStatus:"uploading",videoUploadProgress:pct}).catch(()=>{});
-          const el=$("videoUploadLive"); if(el) el.textContent=`🎥 Video Upload: ${pct}% • Page बंद करू नका`;
-        },rej,()=>res(task.snapshot)));
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUploadStatus:"uploading",videoBytes:blob.size}).catch(()=>{});
+        const snap=await ref.put(blob,{contentType:mime,customMetadata:{name:a.name||"",mobile:a.mobile||"",quizDate:a.date||""}});
         const url=await snap.ref.getDownloadURL();
-        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUrl:url,videoSavedAt:Date.now(),videoBytes:blob.size,videoUploadStatus:"saved",videoUploadProgress:100,videoRecording:false,videoSaveError:null});
-        quizLastVideoBlob=null; quizLastVideoMeta=null;
+        await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUrl:url,videoSavedAt:Date.now(),videoBytes:blob.size,videoUploadStatus:"saved",videoRecording:false});
         resolve(url);
       }catch(e){
         await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoSaveError:String(e.message||e),videoUploadStatus:"failed",videoRecording:false}).catch(()=>{});
@@ -1262,14 +1204,11 @@ async function resumeAttempt(attempt,date,mobile){
   if(activeAttempt.questionOrder.length!==10) activeAttempt.questionOrder=[0,1,2,3,4,5,6,7,8,9];
   qIndex=Number(attempt.currentIndex||0);
   showOnly("quizView");
+  const cameraOK=await startQuizVideo();
+  if(!cameraOK){ showOnly("homeView"); return; }
   $("participantName").textContent=`${attempt.name} • ${attempt.className||""}`;
   activateAntiCheat();
   renderActiveQuestion();
-  // प्रश्न त्वरित सुरू करा; camera/video background मध्ये सुरू होऊ द्या.
-  // Camera fail झाला तरी quiz थांबणार नाही.
-  startQuizVideo().then(ok=>{
-    if(!ok && $("videoStatus")) $("videoStatus").textContent="⚠️ Video सुरू झाला नाही • Quiz सुरू आहे";
-  }).catch(e=>console.warn("Background video start failed",e));
 }
 
 function renderActiveQuestion(){
@@ -1329,36 +1268,8 @@ async function submitAttempt(){
   localStorage.removeItem("ganpati_active");
   deactivateAntiCheat();
   showOnly("doneView");
-  $("doneMeta").innerHTML=`दिनांक: <b>${prettyDate(activeAttempt.date)}</b><br>नाव: <b>${esc(activeAttempt.name)}</b><br>Quiz Time: <b>${fmtDuration(elapsedMs)}</b><br><span id="videoUploadLive"><b>🎥 Video Upload: 0% • Page बंद करू नका</b></span>`;
-  quizVideoUploadPromise?.then(url=>{
-    const el=$("videoUploadLive");
-    if(!el) return;
-    if(url) el.innerHTML=`<b>🎥 Video Upload: 100% • Saved ✓</b>`;
-    else el.innerHTML=`<b style="color:#c0392b">❌ Video Upload Failed</b><br><button class="btn orange" onclick="retryQuizVideoUpload()">↻ RETRY VIDEO UPLOAD</button>`;
-  });
-}
-
-async function retryQuizVideoUpload(){
-  if(!quizLastVideoBlob||!quizLastVideoMeta) return toast("Retry साठी video data उपलब्ध नाही.");
-  const a=quizLastVideoMeta, blob=quizLastVideoBlob;
-  const el=$("videoUploadLive"); if(el) el.innerHTML="<b>🎥 Retry Upload: 0% • Page बंद करू नका</b>";
-  try{
-    const ref=storage.ref(`${ROOT}/quizVideos/${a.date}/${a.mobile}_${Date.now()}.${a.ext}`);
-    await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUploadStatus:"uploading",videoUploadProgress:0,videoSaveError:null}).catch(()=>{});
-    const task=ref.put(blob,{contentType:a.mime,customMetadata:{name:a.name||"",mobile:a.mobile||"",quizDate:a.date||""}});
-    const snap=await new Promise((res,rej)=>task.on("state_changed",ss=>{
-      const pct=ss.totalBytes?Math.round((ss.bytesTransferred/ss.totalBytes)*100):0;
-      dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUploadStatus:"uploading",videoUploadProgress:pct}).catch(()=>{});
-      if(el) el.innerHTML=`<b>🎥 Retry Upload: ${pct}% • Page बंद करू नका</b>`;
-    },rej,()=>res(task.snapshot)));
-    const url=await snap.ref.getDownloadURL();
-    await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoUrl:url,videoSavedAt:Date.now(),videoBytes:blob.size,videoUploadStatus:"saved",videoUploadProgress:100,videoRecording:false,videoSaveError:null});
-    quizLastVideoBlob=null; quizLastVideoMeta=null;
-    if(el) el.innerHTML="<b>🎥 Video Upload: 100% • Saved ✓</b>";
-  }catch(e){
-    await dataUpdate(`attempts/${a.date}/${a.mobile}`,{videoSaveError:String(e.message||e),videoUploadStatus:"failed",videoRecording:false}).catch(()=>{});
-    if(el) el.innerHTML=`<b style="color:#c0392b">❌ Video Upload Failed</b><br><button class="btn orange" onclick="retryQuizVideoUpload()">↻ RETRY VIDEO UPLOAD</button>`;
-  }
+  $("doneMeta").innerHTML=`दिनांक: <b>${prettyDate(activeAttempt.date)}</b><br>नाव: <b>${esc(activeAttempt.name)}</b><br>Quiz Time: <b>${fmtDuration(elapsedMs)}</b><br>🎥 Video: <b>Admin साठी save होत आहे...</b>`;
+  quizVideoUploadPromise?.then(url=>{if(url && $("doneMeta")) $("doneMeta").innerHTML += `<br>🎥 Video: <b>Saved ✓</b>`;});
 }
 
 /* =========================
@@ -1527,7 +1438,7 @@ async function loadLive(){
     const tr=document.createElement("tr");
     tr.innerHTML=`<td>${a.photoPng?`<img class="photo-mini" src="${a.photoPng}" alt="photo">`:"—"}</td>
       <td>${esc(a.name)}</td><td>${esc(a.mobile)}</td><td>${esc(a.className||"")}</td><td>${esc(a.setName||"")}</td>
-      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}<br><span class="small">🛡️ ${Number(a.violationCount||0)} warning${a.deviceId?` • 📱 ${esc(a.deviceId.slice(-6))}`:""}</span></td><td>${a.videoUrl?`<button class="btn green small" onclick="openQuizVideo('${esc(a.videoUrl)}','${esc(a.name)}')">▶ VIDEO</button>`:(a.videoSaveError?`<span class="small" style="color:#c0392b">❌ Upload Failed • Participant Retry</span>`:`<span class="small">${a.videoRecording?"🔴 Recording":"⏳ Pending"}${a.videoUploadStatus?" • "+esc(a.videoUploadStatus):""}${a.videoUploadStatus==="uploading"?` ${Number(a.videoUploadProgress||0)}%`:""}</span>`)}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
+      <td><b>${esc(a.status)}</b>${a.disqualified?" • DQ":""}<br><span class="small">🛡️ ${Number(a.violationCount||0)} warning${a.deviceId?` • 📱 ${esc(a.deviceId.slice(-6))}`:""}</span>${a.videoUrl?`<br><a href="${esc(a.videoUrl)}" target="_blank" rel="noopener">🎥 Video पाहा</a>`:(a.videoSaveError?`<br><span class="small" style="color:#c0392b">Video save failed</span>`:`<br><span class="small">${a.videoRecording?"🔴 Recording":"Video pending"}${a.videoUploadStatus?" • "+esc(a.videoUploadStatus):""}</span>`)}</td><td>${Math.min(10,Number(a.currentIndex||0))}/10</td>
       <td>${fmtTime(a.startedAt)}</td><td>${fmtTime(a.submittedAt)}</td>`;
     body.appendChild(tr);
   });
@@ -1602,7 +1513,6 @@ function renderResults(rows,date){
       <td>${esc(r.name)}</td><td>${esc(r.mobile)}</td><td>${esc(r.className||"")}</td><td>${esc(r.setName)}</td>
       <td><b>${r.score}/10</b></td><td>${fmtDuration(r.elapsedMs)}</td>
       <td>${r.disqualified?"❌ Disqualified":r.verified?"✅ Verified":"Pending"}<br><span class="small">🛡️ Violations: ${Number(r.violationCount||0)}</span></td>
-      <td>${r.videoUrl?`<button class="btn green small" onclick="openQuizVideo('${esc(r.videoUrl)}','${esc(r.name)}')">▶ VIDEO</button>`:(r.videoSaveError?'<span class="small" style="color:#c0392b">❌ Failed</span>':'<span class="small">—</span>')}</td>
       <td>
         <button class="btn light small" onclick="verifyUser('${date}','${r.mobile}',true)">Verify</button>
         <button class="btn red small" onclick="toggleDQ('${date}','${r.mobile}',${!r.disqualified})">${r.disqualified?"Restore":"DQ"}</button>
